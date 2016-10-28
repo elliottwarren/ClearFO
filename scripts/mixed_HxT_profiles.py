@@ -4,7 +4,10 @@ Script to create sets of height x time profile plots. E.g. All 4 ceilometers for
 Created by Fri Elliott 28th Oct 2016
 """
 
+# ToDo Need to sort out the ceil_plot script. Trim the data a bit first to reduce the plotting time.
+
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from matplotlib.dates import date2num
 from matplotlib.dates import DateFormatter
 
@@ -15,6 +18,7 @@ from scipy.stats import spearmanr
 import ceilUtils as ceil
 import ellUtils as eu
 from forward_operator import FOUtils as FO
+from forward_operator import FOconstants as FOcon
 
 def main():
 
@@ -25,7 +29,7 @@ def main():
 
     # which modelled data to read in
     model_type = 'UKV'
-    res = FO.model_resolution[model_type]
+    res = FOcon.model_resolution[model_type]
 
     # directories
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
@@ -35,18 +39,14 @@ def main():
     # data
     ceilDatadir = datadir + 'L1/'
     modDatadir = datadir + model_type + '/'
-    rhDatadir = datadir + 'L1/'
-    aerDatadir = datadir + 'LAQN/'
 
     # instruments and other settings
     site_bsc = FO.site_bsc
-    site_rh = FO.site_rh
-    site_aer = FO.site_aer
     site_bsc_colours = FO.site_bsc_colours
 
     # day start and end
     dayStart = dt.datetime(2016, 05, 04)
-    dayEnd = dt.datetime(2016, 05, 04)
+    dayEnd = dt.datetime(2016, 05, 06)
 
 
     # ==============================================================================
@@ -75,16 +75,46 @@ def main():
         # -----------------------
 
         # read in ALL ceilometer data, without subsampling times to match the model
-        bsc_obs = FO.read_ceil_obs_all(day, site_bsc, ceilDatadir, mod_data)
+        bsc_obs = FO.read_ceil_obs_all(day, site_bsc, ceilDatadir)
 
         # ==============================================================================
         # Plotting
         # ==============================================================================
 
+        # plot \beta_o and \beta_m for the same site in coupled plots.
 
+        for site in bsc_obs.keys():
 
+            # short site id that matches the model id
+            site_id = site.split('_')[-1]
 
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 4))
 
+            # obs
+            mesh1, ax1 = ceil.ceil_plot_to_ax(bsc_obs[site], ax1,
+                            hmax=2000, vmin=1e-7, vmax=5e-6,
+                            tmin=day, tmax=day+dt.timedelta(days=1))
+
+            # model
+            mod_data[site_id]['height'] = mod_data[site_id]['level_height']
+            mesh2, ax2 = ceil.ceil_plot_to_ax(mod_data[site_id], ax2,
+                            hmax=2000, vmin=1e-7, vmax=5e-6,
+                            tmin=day, tmax=day + dt.timedelta(days=1))
+
+            plt.tight_layout()
+
+            # figure colourbar
+            cax, kw = mpl.colorbar.make_axes([ax1, ax2])
+            plt.colorbar(mesh1, cax=cax, **kw)
+
+            ax0 = eu.fig_majorAxis(fig)
+            ax0.set_title(site_id + ' - ' + day.strftime("%d/%m/%Y"))
+            ax0.set_ylabel('Height [m]')
+            ax0.set_xlabel('Time [HH:MM]')
+
+            # save fig
+            plt.savefig(savedir + 'dailyPlots/' + 'obs-' + site_id + '_' + model_type + '-' + site_id
+                        + '_' + day.strftime("%Y%m%d") + '.png')
 
 
 
