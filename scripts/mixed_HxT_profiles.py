@@ -8,12 +8,8 @@ Created by Fri Elliott 28th Oct 2016
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from matplotlib.dates import date2num
-from matplotlib.dates import DateFormatter
 
-import numpy as np
 import datetime as dt
-from scipy.stats import spearmanr
 
 import ceilUtils as ceil
 import ellUtils as eu
