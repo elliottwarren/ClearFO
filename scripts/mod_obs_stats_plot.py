@@ -228,13 +228,13 @@ def main():
     site_aer = FO.site_aer
     site_bsc_colours = FO.site_bsc_colours
 
-    # day start and end
-    dayStart = dt.datetime(2016, 05, 04)
-    dayEnd = dt.datetime(2016, 05, 06)
+    # day start and end of the MAIN DAYS (forecast day + 1)
+    dayStart = dt.datetime(2016, 04, 20)
+    dayEnd = dt.datetime(2016, 05, 21)
 
     # statistics to run
-    stats_corr = False
-    stats_mbe = True
+    stats_corr = True
+    stats_mbe = False
 
     # mbe ranges
     mbe_limit_step = 500
