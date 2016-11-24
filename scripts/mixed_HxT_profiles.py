@@ -41,8 +41,8 @@ def main():
     site_bsc_colours = FO.site_bsc_colours
 
     # day start and end
-    dayStart = dt.datetime(2016, 05, 04)
-    dayEnd = dt.datetime(2016, 05, 06)
+    dayStart = dt.datetime(2015, 04, 20)
+    dayEnd = dt.datetime(2015, 04, 21)
 
 
     # ==============================================================================
@@ -98,6 +98,7 @@ def main():
                             tmin=day, tmax=day + dt.timedelta(days=1))
 
             plt.tight_layout()
+            plt.subplots_adjust(left=0.1, right=1)
 
             # figure colourbar
             cax, kw = mpl.colorbar.make_axes([ax1, ax2])
