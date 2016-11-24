@@ -100,7 +100,7 @@ def unique_pairs(obs_idx, diff):
 
     return unique_pairs_range
 
-def plot_correlations(savedir, model_type, statistics):
+def plot_correlations(savedir, model_type, statistics, corr_max_height):
 
     """
     plot the correlation statistics (\beta_m, site vs \beta_o, site) and save.
@@ -123,14 +123,15 @@ def plot_correlations(savedir, model_type, statistics):
     # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
     ax.set_xlim([data['time'][0], data['time'][-1]])
     ax.set_ylim([-0.5, 1])
-    ax.set_xlabel('Time [HH:MM]')
+    ax.set_xlabel('Time [DD/ HH:MM]')
     ax.set_ylabel(r'$Spearman \/\/\rho \/\/correlation$')
     ax.xaxis.set_major_formatter(DateFormatter('%d/ %H:%M'))
     ax.legend(loc='best', fontsize=8)
 
     plt.savefig(savedir +'correlations/' +
                       model_type + '_SpearCorrTs_' +
-                      data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d")+ '.png')  # filename
+                      data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d")+'_'+
+                      str(corr_max_height) + 'm.png')  # filename
 
     return fig
 
@@ -228,9 +229,9 @@ def main():
     site_aer = FO.site_aer
     site_bsc_colours = FO.site_bsc_colours
 
-    # day start and end of the MAIN DAYS (forecast day + 1)
-    dayStart = dt.datetime(2016, 04, 20)
-    dayEnd = dt.datetime(2016, 05, 21)
+    # day start and end of the MAIN DAYS, inclusively(forecast day + 1)
+    dayStart = dt.datetime(2015, 04, 14)
+    dayEnd = dt.datetime(2015, 04, 15)
 
     # statistics to run
     stats_corr = True
@@ -239,6 +240,9 @@ def main():
     # mbe ranges
     mbe_limit_step = 500
     mbe_limit_max = 2000
+
+    # correlation max height
+    corr_max_height = 2000
 
     # calculate the height groups and matching strings
     mbe_height_limits = np.arange(0, mbe_limit_max + mbe_limit_step, mbe_limit_step)
@@ -314,7 +318,7 @@ def main():
 
             # Remove pairs where obs is above 2000 m.
             # hc = height cut
-            hc_unique_pairs_range = np.where(values_unique_pairs <= 2000)[0]
+            hc_unique_pairs_range = np.where(values_unique_pairs <= corr_max_height)[0]
 
             # trim off unique pairs that are above the maximum height
             obs_hc_unique_pairs = obs_unique_pairs[hc_unique_pairs_range]
@@ -335,7 +339,13 @@ def main():
                 if stats_corr == True:
 
                     # correlate and store
-                    r, p = spearmanr(obs_x, mod_y)
+                    # if number of remaining pairs is too low, set r and p to nan
+                    try:
+                        r, p = spearmanr(np.log10(obs_x), np.log10(mod_y), nan_policy='omit')
+                    except:
+                        r = np.nan
+                        p = np.nan
+
                     statistics[site_id]['r'] += [r]
                     statistics[site_id]['p'] += [p]
 
@@ -364,7 +374,7 @@ def main():
     # After all day's stats are done
 
     if stats_corr == True:
-        fig = plot_correlations(savedir, model_type, statistics)
+        fig = plot_correlations(savedir, model_type, statistics, corr_max_height)
 
     if stats_mbe == True:
 
