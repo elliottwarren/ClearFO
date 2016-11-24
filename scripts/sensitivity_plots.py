@@ -4,6 +4,7 @@ Script to make sensitivity plots of the different FO parameters
 """
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from forward_operator import FOconstants as FOcon
 from forward_operator import FOUtils as FO
@@ -11,6 +12,9 @@ from forward_operator import FOUtils as FO
 # -----------------------------------------------------------
 # Constants
 # -----------------------------------------------------------
+
+savedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/figures/sensitivity/'
+
 # density of aerosol (for ammonium sulphate)
 rho_a = FOcon.rho_a
 
@@ -35,49 +39,49 @@ m0 = FOcon.m0_aer  # (m0) standard mass mixing ratio of the aerosol
 eta = FOcon.eta
 Q = FOcon.Q_ext_aer
 
-# Compute the aerosol number density N_aer. Eqn. 3 in Clark et.al. (2008) and Eqn 39 in UMDP 26 Large-scale precip.
+# range of murk aerosol [micrograms kg-1]
+q_aer = np.arange(0, 301)
+
+# convert micrograms kg-1 to kg/kg
 q_aer_kg_kg = q_aer * 1.0e-9  # convert micrograms kg-1 to kg/kg
 
 # -----------------------------------------------------------
 # 1. r_md
 # -----------------------------------------------------------
 
-
-N_aer = N0 * np.power((q_aer_kg_kg / m0), 0.5)
-
 # r_md is the dry mean volume radius. Eqn. 2 in Clark et.al. (2008)
 r_md = r0 * np.power((q_aer_kg_kg / m0), p)
 
-# rm is the mean volume radius. Eqn. 12 in Clark et.al. (2008)
-# "When no activated particles are present an analytic solution for rm" is
-RH_crit = FOcon.RH_crit
-#    print "RH_crit = ", RH_crit
-#    print RH[1:70, 1:4]
-# mask over values less than critical
-RH_ge_RHcrit = np.ma.masked_less(RH, RH_crit)
+# set up plot
+fig = plt.figure(figsize=(6, 4))
+ax = plt.subplot2grid((1, 1), (0, 0))
 
-RH_factor = 0.01  # Relative Humidity in 0.38 not 38%
+ax.plot(q_aer, r_md)
+ax.set_ylabel('r_md [kg kg-1]')
+ax.set_xlabel('murk aerosol [microgram kg-1]')
+plt.tight_layout()
 
-# eq 12 - calc rm for RH greater than critical
-rm = np.ma.ones(RH.shape) - (B / np.ma.log(RH_factor * RH_ge_RHcrit))
-rm2 = np.ma.power(rm, 1. / 3.)
-rm = np.ma.array(r_md) * rm2
+plt.savefig(savedir + 'murk_rmd.png')  # filename
+plt.close(fig)
 
-# set rm as 0 where RH is less than crit
-rm = np.ma.MaskedArray.filled(rm, [0.0])
-where_lt_crit = np.where(np.logical_or(RH.data < RH_crit, rm == 0.0))
-rm[where_lt_crit] = r_md[where_lt_crit]
+# -----------------------------------------------------------
+# 2. N_0
+# -----------------------------------------------------------
 
-# Close to activation one must solve the full equation (Kohler curve), not done in this code.
-# Assumptions made here include:
-# 1. Q_ext = scattering efficiency is independent of particle size and is assumed to be on average = 2.0
-# 2. Only time RH is taken into account is in equation 12 above in the
-# calculation of a mean radius. No attempt is made to model the variation
-# of particle growth with RH AS A FUNCTION OF SIZE of particle.
+# Compute the aerosol number density N_aer. Eqn. 3 in Clark et.al. (2008) and Eqn 39 in UMDP 26 Large-scale precip.
+N_aer = N0 * np.power((q_aer_kg_kg / m0), 0.5)
 
-# Calculate extinction coefficient
-# eqns. 17-18 in Clark et.al. (2008)
-alpha_a = (eta * Q) * np.pi * N_aer * np.power(rm, 2)
+# set up plot
+fig = plt.figure(figsize=(6, 4))
+ax = plt.subplot2grid((1, 1), (0, 0))
 
-# Calculate backscatter using a constant lidar ratio
-beta_a = alpha_a / S
+ax.plot(q_aer, N_aer)
+ax.set_ylabel('N_0 [kg-1]')
+ax.set_xlabel('murk aerosol [microgram kg-1]')
+plt.tight_layout()
+
+plt.savefig(savedir + 'murk_N0.png')  # filename
+plt.close(fig)
+
+
+
