@@ -16,6 +16,7 @@ import datetime as dt
 
 import ellUtils as eu
 from forward_operator import FOUtils as FO
+from forward_operator import FOconstants as FOcon
 
 # Plotting
 
@@ -239,7 +240,7 @@ def main():
     model_type = 'UKV'
 
     # model resolution
-    res = FO.model_resolution[model_type]
+    res = FOcon.model_resolution[model_type]
 
     # directories
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
@@ -252,29 +253,14 @@ def main():
     rhDatadir = datadir + 'L1/'
     aerDatadir = datadir + 'LAQN/'
 
-    # sites with height pairs
-    # height above sea level (LUMA metadata)- height above ground (DTM) = height above surface
-    # surface height taken from DTM (Grimmond and ...) - Digital Terrain Model (surface only, no buildings)
-    # ToDo IMU needs updating!!!!
-    # ToDo RH heights needs filling in too!
-    site_bsc = {'CL31-A_BSC_IMU': 79.0 - 14.7, 'CL31-B_BSC_RGS': 28.1 - 19.4, 'CL31-C_BSC_MR': 32.0 - 27.5,
-                'CL31-D_BSC_NK': 27.0 - 23.2}
-    site_rh = {'WXT_KSSW': 0, 'Davis_BCT': 0, 'Davis_BFCL': 0, 'Davis_BGH': 0, 'Davis_IMU': 0, 'Davis_IML': 0}
-    site_aer = {'PM10_RGS': 23.0 - 19.4, 'PM10_MR': 32.0 - 27.5, 'PM10_NK': 26.0 - 23.2}
-    # sites = site_bsc + site_rh + site_aer
+    # instruments and other settings
+    site_bsc = FO.site_bsc
+    site_rh = FO.site_rh
+    site_aer = FO.site_aer
+    site_bsc_colours = FO.site_bsc_colours
 
-    # colours for plotting
-    site_bsc_colours = {'IMU': 'b', 'RGS': 'y', 'MR': 'r', 'NK': 'm', 'SW': 'k', 'KSSW': 'c'}
-    # ax.set_prop_cycle(cycler('color', ['b', 'c', 'm', 'y', 'k']))
-
-    # ceil_height_offset = [79.0 - 14.7, 28.1 - 19.4, 32.0 - 27.5, 27.0 - 23.2]
-    aer_heights = [23.0 - 19.4, 32.0 - 27.5, 26.0 - 23.2]
-    rh_heights = [0, 0, 0, 0, 0, 0]
 
     # days to loop between
-    # dayStart = dt.datetime(2016, 05, 03)
-    # dayEnd = dt.datetime(2016, 05, 05)
-
     dayStart = dt.datetime(2016, 05, 04)
     dayEnd = dt.datetime(2016, 05, 06)
 
@@ -330,6 +316,8 @@ def main():
         # ==============================================================================
 
         for t in np.arange(len(bsc_obs['CL31-A_BSC_IMU']['time'])):
+
+            print t
 
             # current hour as string
             t_hr = bsc_obs['CL31-A_BSC_IMU']['time'][t]
