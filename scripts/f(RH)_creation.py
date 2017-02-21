@@ -190,21 +190,31 @@ def main():
         aer_index = {'Accum. Sulphate': 14, 'Aitken Sulphate': 15, 'Aged fossil-fuel OC': 24, 'Ammonium nitrate': 26}
         aer_order = ['Accum. Sulphate', 'Aitken Sulphate', 'Aged fossil-fuel OC', 'Ammonium nitrate']
 
+    # Q type to use in calculating f(RH)
+    Q_type = 'extinction'
+
     # ---------------------------------------------------
-    # Read and Process
+    # Read, Process and save f(RH)
     # ---------------------------------------------------
 
     # read in the spectral band information
     spec_bands = read_spec_bands(file_path)
 
     # read the aerosol data
+    # NOTE: fixed to use band 4 (690 - 1190 nm band)
     data = read_aer_data(file_path, aer_index, aer_order)
 
+    # Extract RH (RH is the same across all aerosol types)
+    RH = np.array(data[aer_order[0]][:, 0])
+
     # calculate f(RH)
-    Q, f_RH = calc_f_RH(data, aer_order, Q_type='extinction')
+    Q, f_RH = calc_f_RH(data, aer_order, Q_type=Q_type)
 
     # create an average f(RH)
     f_RH['average'] = np.mean(f_RH.values(), axis=0)
+
+    # save f(RH)
+    np.savetxt(datadir +  'calculated_f(RH).csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
 
     # ---------------------------------------------------
     # Plotting
@@ -214,17 +224,17 @@ def main():
     fig = plt.figure(figsize=(6, 4))
     for key, value in data.iteritems():
 
-        plt.plot(value[:, 0], f_RH[key], label = key, linestyle='--')
+        plt.plot(value[:, 0], f_RH[key], label=key, linestyle='--')
 
     # plot the average one (use RH from the last data.iteritems()
     plt.plot(value[:, 0], f_RH['average'], label='average', color='black')
 
     plt.legend(fontsize=9, loc='best')
     plt.xlabel('RH')
-    plt.ylabel('extinction f(RH)')
+    plt.ylabel(Q_type + ' f(RH)')
     plt.ylim([0, 8.0])
     plt.title(file_name + ': 690-1190nm band')
-    plt.savefig(savedir + file_name + '_ext_f_RH_690-1190nm.png')
+    plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_690-1190nm.png')
 
 
 if __name__ == '__main__':
