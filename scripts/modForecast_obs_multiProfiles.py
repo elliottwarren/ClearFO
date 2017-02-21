@@ -63,8 +63,8 @@ def bsc_profile_plot(ax, mod_data, bsc_obs, site_bsc_colours, t):
     ax.set_ylabel('Height [m]')
 
     ax.set_ylim([0, 2000])
-    ax.set_xlim([-7, -5])
-    ax.xaxis.set_ticks(np.arange(-7, -4.5, 0.5))
+    ax.set_xlim([-7.5, -5.0])
+    ax.xaxis.set_ticks(np.arange(-7.5, -4.5, 0.5))
     # ax.set_prop_cycle(cycler('color', ['b', 'c', 'm', 'y', 'k']))
     eu.add_at(ax, 'a)', loc=2)
 
@@ -148,7 +148,7 @@ def aer_profile_plot(ax, site_aer, pm10_obs, mod_data, site_bsc_colours, t):
 
     return ax
 
-def rh_ts_plot(ax, rh_obs, mod_data, site_bsc_colours, t):
+def rh_ts_plot(ax, rh_obs, mod_data, site_bsc_colours, t_hr):
 
     """
     Plot the rh time series for the period. Uses average rh model input calculated
@@ -182,7 +182,7 @@ def rh_ts_plot(ax, rh_obs, mod_data, site_bsc_colours, t):
                      color=colour, label=site_mod, linewidth=2, fmt='-', ls='--')
 
     # plot reference line to show where profile lies
-    ax.plot_date([t, t], [0, 100], color='black', ls='--', fmt='--')
+    ax.plot_date([t_hr, t_hr], [0, 100], color='black', ls='--', fmt='--')
 
     # prettify
     ax.set_ylabel(r'$\mathrm{RH\/\/[\%]}$')
@@ -195,7 +195,7 @@ def rh_ts_plot(ax, rh_obs, mod_data, site_bsc_colours, t):
 
     return ax
 
-def aer_ts_plot(ax, pm10_obs, mod_data, site_bsc_colours, t):
+def aer_ts_plot(ax, pm10_obs, mod_data, site_bsc_colours, t_hr):
 
 
     # plot pm10 obs profile plots
@@ -215,7 +215,7 @@ def aer_ts_plot(ax, pm10_obs, mod_data, site_bsc_colours, t):
                      color=colour, label=site_mod, linewidth=2, fmt='-', ls='--')
 
     # plot reference line to show where profile lies
-    ax.plot_date([t, t], [0, 100], color='black', ls='--', fmt='-')
+    ax.plot_date([t_hr, t_hr], [0, 100], color='black', ls='--', fmt='-')
 
     # prettify
     ax.set_ylabel(r'$m \/\mathrm{[\mu g\/ kg^{-1}]}$')
@@ -254,11 +254,10 @@ def main():
     aerDatadir = datadir + 'LAQN/'
 
     # instruments and other settings
-    site_bsc = FO.site_bsc
-    site_rh = FO.site_rh
-    site_aer = FO.site_aer
-    site_bsc_colours = FO.site_bsc_colours
-
+    site_bsc = FOcon.site_bsc
+    site_rh = FOcon.site_rh
+    site_aer = FOcon.site_aer
+    site_bsc_colours = FOcon.site_bsc_colours
 
     # days to loop between
     dayStart = dt.datetime(2016, 05, 04)
@@ -272,6 +271,9 @@ def main():
     # 1. Read Ceilometer metadata
     # ----------------------------
     ceil_metadata = FO.read_ceil_metadata(datadir)
+
+    # 2. Read calibration data
+    # ----------------------------
 
 
     # datetime range to iterate over
@@ -309,7 +311,9 @@ def main():
 
 
         # do any stats on time reduced data here...
-
+        # ToDo move this out
+        #for key, calib in ceil_calib.iteritems():
+        #    bsc_obs[key]['backscatter'] *= calib
 
         # ==============================================================================
         # Plotting
@@ -342,10 +346,10 @@ def main():
             ax3 = aer_profile_plot(ax3, site_aer, pm10_obs, mod_data, site_bsc_colours, t)
 
             # RH time series
-            ax4 = rh_ts_plot(ax4, rh_obs, mod_data, site_bsc_colours, t)
+            ax4 = rh_ts_plot(ax4, rh_obs, mod_data, site_bsc_colours, t_hr)
 
             # PM10 time series
-            ax5 = aer_ts_plot(ax5, pm10_obs, mod_data, site_bsc_colours, t)
+            ax5 = aer_ts_plot(ax5, pm10_obs, mod_data, site_bsc_colours, t_hr)
 
             # final prettifying for figure
             fig.suptitle('BSC: ' + t_hr.strftime("%Y-%m-%d %H:%M:%S"), fontsize=12)
