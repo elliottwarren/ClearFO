@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 import datetime as dt
+from copy import deepcopy
 
 import ellUtils as eu
 from forward_operator import FOUtils as FO
@@ -29,7 +30,7 @@ def main():
     # directories
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
     datadir = maindir + 'data/'
-    savedir = maindir + 'figures/' + model_type + '/'
+    savedir = maindir + 'figures/' + model_type + '/summary/'
 
     # data
     ceilDatadir = datadir + 'L1/'
@@ -52,33 +53,55 @@ def main():
     # Read and process modelled data
     # ==============================================================================
 
-    # 1. Read Ceilometer metadata
-    # ----------------------------
+    # Read Ceilometer metadata
     ceil_metadata = FO.read_ceil_metadata(datadir)
-
-    # 2. Read calibration data
-    # ----------------------------
-
 
     # datetime range to iterate over
     days_iterate = eu.date_range(dayStart, dayEnd, 1, 'days')
 
     for day in days_iterate:
 
-
-        # 2. Read UKV forecast in
-        # -----------------------
+        # Read and concatonate data
+        # ---------------------------
 
         # extract MURK aerosol and calculate RH for each of the sites in the ceil metadata
         # (can be different locations to sites_bsc)
-        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res)
+        mod_day_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, allvars=True)
 
 
-        # ==============================================================================
-        # Plotting
-        # ==============================================================================
+        # concatonate data
+        if day == days_iterate[0]:
+            mod_data = deepcopy(mod_day_data)
+        else:
+            mod_data = eu.merge_dicts(mod_data, mod_day_data)
+
+    # ==============================================================================
+    # Plotting
+    # ==============================================================================
 
 
+    # r_m
+    fig = plt.figure(figsize=(8, 4.5))
+
+    for site, site_data in mod_data.iteritems():
+
+        r_m = site_data['r_m'] * 1.0e6 # micrometers
+
+        # line style
+        y, binEdges = np.histogram(r_m, bins=50)
+        bincenters = 0.5 * (binEdges[1:] + binEdges[:-1])
+        plt.plot(bincenters, y, '-', label=site)
+
+        plt.xlabel(r'$radius \/\mathrm{[\mu m]}]}$')
+        plt.ylabel('frequency')
+        plt.grid()
+        plt.legend(loc='best', fancybox=True, framealpha=0.5)
+        plt.tight_layout()
+        plt.savefig(savedir + 'r_m_dist_linestyle' + '.png')
+        plt.close(fig)
+
+        # stack style
+        n, bins, patches = plt.hist(r_m, 50, alpha=0.75, label=site, edgecolor='none')
 
     print 'END PROGRAM'
 
