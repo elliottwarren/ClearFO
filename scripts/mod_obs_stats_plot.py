@@ -108,7 +108,7 @@ def plot_correlations(savedir, model_type, statistics, corr_max_height):
     :return: fig
     """
 
-    fig = plt.figure(figsize=(7, 5))
+    fig = plt.figure(figsize=(8, 5))
     ax = plt.subplot2grid((1, 1), (0, 0))
 
     for site, data in statistics.iteritems():
@@ -224,14 +224,14 @@ def main():
     aerDatadir = datadir + 'LAQN/'
 
     # instruments and other settings
-    site_bsc = FO.site_bsc
-    site_rh = FO.site_rh
-    site_aer = FO.site_aer
-    site_bsc_colours = FO.site_bsc_colours
+    site_bsc = FOcon.site_bsc
+    site_rh = FOcon.site_rh
+    site_aer = FOcon.site_aer
+    site_bsc_colours = FOcon.site_bsc_colours
 
     # day start and end of the MAIN DAYS, inclusively(forecast day + 1)
-    dayStart = dt.datetime(2015, 04, 14)
-    dayEnd = dt.datetime(2015, 04, 15)
+    dayStart = dt.datetime(2016, 05, 04)
+    dayEnd = dt.datetime(2016, 05, 06)
 
     # statistics to run
     stats_corr = True
