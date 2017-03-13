@@ -7,6 +7,7 @@ Created by Elliott 06/02/2017
 
 import numpy as np
 import matplotlib.pyplot as plt
+from copy import deepcopy
 
 def read_spec_bands(file_path):
 
@@ -58,7 +59,7 @@ def read_spec_bands(file_path):
 
     return spec_bands
 
-def read_aer_data(file_path, aer_index, aer_order):
+def read_aer_data(file_path, aer_index, aer_order, band=4):
 
     """
     Read in the aerosol data, calculate the Qs
@@ -69,6 +70,9 @@ def read_aer_data(file_path, aer_index, aer_order):
     :param Q_type:
     :return:
     """
+
+    print "Reading from:" + file_path
+    print "Band: " + str(band)
 
     # define arrays
     data = {}
@@ -92,7 +96,7 @@ def read_aer_data(file_path, aer_index, aer_order):
             line = line.rstrip('\n\r')
             line = ' '.join(line.split())
 
-        while line != 'Band = 4':
+        while line != 'Band = ' + str(band):
             line = file.readline()
             line = line.rstrip('\n\r')
             line = ' '.join(line.split())
@@ -107,7 +111,7 @@ def read_aer_data(file_path, aer_index, aer_order):
         line = line.rstrip('\n\r')
 
         # when reached the data line...
-        while line != 'Band = 5':
+        while line != 'Band = ' + str(band + 1):
 
 
             line = ' '.join(line.split()) # remove duplicate, trailing and leading spaces
@@ -179,8 +183,6 @@ def main():
     file_name = 'sp_sw_ga7'
     file_path = datadir + file_name
 
-    ceil_lam = 0.91e-06
-
     # variables to take from file (as listed within the file) with index from BLOCK = 0
     # NOTE: data MUST be in ascending index order
     if file_name == 'spec3a_sw_hadgem1_7lean_so':
@@ -192,6 +194,10 @@ def main():
 
     # Q type to use in calculating f(RH)
     Q_type = 'extinction'
+    print 'Q_type = ' + Q_type
+
+    # band range to use
+    band = 3
 
     # ---------------------------------------------------
     # Read, Process and save f(RH)
@@ -200,9 +206,15 @@ def main():
     # read in the spectral band information
     spec_bands = read_spec_bands(file_path)
 
+    # wavelength range in current band
+    band_idx = np.where(spec_bands['band'] == band)[0][0]
+    band_lam_range = str(spec_bands['lower_limit'][band_idx] * 1.0e9)[:3] + '-' + \
+                     str(spec_bands['upper_limit'][band_idx] * 1.0e9)[:3] + 'nm'
+
+
+
     # read the aerosol data
-    # NOTE: fixed to use band 4 (690 - 1190 nm band)
-    data = read_aer_data(file_path, aer_index, aer_order)
+    data = read_aer_data(file_path, aer_index, aer_order, band=band)
 
     # Extract RH (RH is the same across all aerosol types)
     RH = np.array(data[aer_order[0]][:, 0])
@@ -211,11 +223,12 @@ def main():
     Q, f_RH = calc_f_RH(data, aer_order, Q_type=Q_type)
 
     # create an average f(RH)
-    f_RH['average'] = np.mean(f_RH.values(), axis=0)
+    f_RH['average with Aitken Sulphate'] = np.mean(f_RH.values(), axis=0)
+    f_RH['average'] = np.mean((f_RH['Accum. Sulphate'], f_RH['Aged fossil-fuel OC'], f_RH['Ammonium nitrate']), axis=0)
 
     # save f(RH)
-    np.savetxt(datadir +  'calculated_f(RH).csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
-
+    # np.savetxt(datadir +  'calculated_ext_f(RH)_'+str(ceil_lam)+'nm.csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
+    np.savetxt(datadir +  'calculated_ext_f(RH)_320-690nm.csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
     # ---------------------------------------------------
     # Plotting
     # ---------------------------------------------------
@@ -226,15 +239,20 @@ def main():
 
         plt.plot(value[:, 0], f_RH[key], label=key, linestyle='--')
 
+    plt.plot(value[:, 0], f_RH['average with Aitken Sulphate'], label='average with Aitken Sulphate', linestyle='-')
+
     # plot the average one (use RH from the last data.iteritems()
-    plt.plot(value[:, 0], f_RH['average'], label='average', color='black')
+    plt.plot(value[:, 0], f_RH['average'], label='average without Aitken Sulphate', color='black')
+
 
     plt.legend(fontsize=9, loc='best')
     plt.xlabel('RH')
     plt.ylabel(Q_type + ' f(RH)')
     plt.ylim([0, 8.0])
-    plt.title(file_name + ': 690-1190nm band')
-    plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_690-1190nm.png')
+    plt.title(file_name + ': 320-690nm band')
+    plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_320-690nm.png')
+    # plt.title(file_name + ': 690-1190nm band')
+    # plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_690-1190nm.png')
 
 
 if __name__ == '__main__':
