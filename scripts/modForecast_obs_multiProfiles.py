@@ -63,6 +63,8 @@ def bsc_profile_plot(ax, mod_data, bsc_obs, site_bsc_colours, t):
     ax.set_ylabel('Height [m]')
 
     ax.set_ylim([0, 2000])
+    # ax.set_xlim([-7.5, -5.0])
+    # ax.xaxis.set_ticks(np.arange(-7.5, -4.5, 0.5))
     ax.set_xlim([-7.5, -5.0])
     ax.xaxis.set_ticks(np.arange(-7.5, -4.5, 0.5))
     # ax.set_prop_cycle(cycler('color', ['b', 'c', 'm', 'y', 'k']))
@@ -239,6 +241,9 @@ def main():
     # which modelled data to read in
     model_type = 'UKV'
 
+    # ceilometer wavelength [nm]
+    ceil_lam = 910
+
     # model resolution
     res = FOcon.model_resolution[model_type]
 
@@ -287,7 +292,7 @@ def main():
 
         # extract MURK aerosol and calculate RH for each of the sites in the ceil metadata
         # (can be different locations to sites_bsc)
-        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res)
+        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, ceil_lam)
 
 
         # 3. Read WXT and Davis
@@ -380,8 +385,6 @@ def main():
             plt.close(fig)
 
     print 'END PROGRAM'
-
-    plt.close('all')
 
     return
 
