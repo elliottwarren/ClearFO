@@ -271,7 +271,7 @@ def main():
         # extract MURK aerosol and calculate RH for each of the sites in the ceil metadata
         # (can be different locations to sites_bsc)
         # reads all london model data, extracts site data, stores in single dictionary
-        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res)
+        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910)
 
 
         # 2. Read ceilometer backscatter
