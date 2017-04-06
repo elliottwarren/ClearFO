@@ -1,4 +1,3 @@
-
 """
 Create the f(RH) graph and look up table for use in calculating the extinction efficiency (Q)
 
@@ -111,8 +110,7 @@ def read_aer_data(file_path, aer_index, aer_order, band=4):
         line = line.rstrip('\n\r')
 
         # when reached the data line...
-        while line != 'Band = ' + str(band + 1):
-
+        while (line != 'Band = ' + str(band + 1)) & (line != '*END'):
 
             line = ' '.join(line.split()) # remove duplicate, trailing and leading spaces
             line_split = line.split(' ')
@@ -169,19 +167,23 @@ def calc_f_RH(data, aer_order, Q_type=''):
 
 def main():
 
-    # setup
-    # find wavelength band
-    # read file
-    # find blocks
-    # format data
-    # create f(RH) curve using \sigma_ext(RH=0) from file as \sigma_ext(dry)
+    # User set args
+    # band that read_spec_bands() uses to find the correct band
+    #! Manually set
+    band = 1
+
+    # -------------------------
 
     # directories
     savedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/figures/Mie/f(RH)/'
-    datadir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/'
+    specdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/spectral/'
+    f_RHdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/'
+
     # file_name = 'spec3a_sw_hadgem1_7lean_so' # original file given to me by Claire Ryder 25/01/17
-    file_name = 'sp_sw_ga7'
-    file_path = datadir + file_name
+    # file_name = 'sp_sw_ga7' # current UM file
+    # file_name = 'sp_ew_910' # my own made file with 1 band at 910 nm
+    file_name = 'sp_ew_ceil_guass_903-907'
+    file_path = specdir + file_name
 
     # variables to take from file (as listed within the file) with index from BLOCK = 0
     # NOTE: data MUST be in ascending index order
@@ -189,15 +191,15 @@ def main():
         aer_index = {'Accum. Sulphate': 6, 'Aitken Sulphate': 7, 'Aged fossil-fuel OC': 22}
         aer_order = ['Accum. Sulphate', 'Aitken Sulphate', 'Aged fossil-fuel OC']
     else:
-        aer_index = {'Accum. Sulphate': 14, 'Aitken Sulphate': 15, 'Aged fossil-fuel OC': 24, 'Ammonium nitrate': 26}
-        aer_order = ['Accum. Sulphate', 'Aitken Sulphate', 'Aged fossil-fuel OC', 'Ammonium nitrate']
+        aer_index = {'Accum. Sulphate': 1, 'Aged fossil-fuel OC': 2, 'Ammonium nitrate': 3}
+        aer_order = ['Accum. Sulphate', 'Aged fossil-fuel OC', 'Ammonium nitrate']
+
+        # aer_index = {'Accum. Sulphate': 14, 'Aitken Sulphate': 15, 'Aged fossil-fuel OC': 24, 'Ammonium nitrate': 26}
+        # aer_order = ['Accum. Sulphate', 'Aitken Sulphate', 'Aged fossil-fuel OC', 'Ammonium nitrate']
 
     # Q type to use in calculating f(RH)
     Q_type = 'extinction'
     print 'Q_type = ' + Q_type
-
-    # band range to use
-    band = 3
 
     # ---------------------------------------------------
     # Read, Process and save f(RH)
@@ -208,9 +210,8 @@ def main():
 
     # wavelength range in current band
     band_idx = np.where(spec_bands['band'] == band)[0][0]
-    band_lam_range = str(spec_bands['lower_limit'][band_idx] * 1.0e9)[:3] + '-' + \
-                     str(spec_bands['upper_limit'][band_idx] * 1.0e9)[:3] + 'nm'
-
+    band_lam_range = '%.0f' % (spec_bands['lower_limit'][band_idx] * 1.0e9) + '-' + \
+                     '%.0f' % (spec_bands['upper_limit'][band_idx] * 1.0e9) + 'nm'
 
 
     # read the aerosol data
@@ -223,12 +224,12 @@ def main():
     Q, f_RH = calc_f_RH(data, aer_order, Q_type=Q_type)
 
     # create an average f(RH)
-    f_RH['average with Aitken Sulphate'] = np.mean(f_RH.values(), axis=0)
+    # f_RH['average with Aitken Sulphate'] = np.mean(f_RH.values(), axis=0)
     f_RH['average'] = np.mean((f_RH['Accum. Sulphate'], f_RH['Aged fossil-fuel OC'], f_RH['Ammonium nitrate']), axis=0)
 
     # save f(RH)
     # np.savetxt(datadir +  'calculated_ext_f(RH)_'+str(ceil_lam)+'nm.csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
-    np.savetxt(datadir +  'calculated_ext_f(RH)_320-690nm.csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
+    np.savetxt(f_RHdir +  file_name + '_ext_f(RH)_' + band_lam_range + '.csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
     # ---------------------------------------------------
     # Plotting
     # ---------------------------------------------------
@@ -239,20 +240,21 @@ def main():
 
         plt.plot(value[:, 0], f_RH[key], label=key, linestyle='--')
 
-    plt.plot(value[:, 0], f_RH['average with Aitken Sulphate'], label='average with Aitken Sulphate', linestyle='-')
+    # plt.plot(value[:, 0], f_RH['average with Aitken Sulphate'], label='average with Aitken Sulphate', linestyle='-')
 
     # plot the average one (use RH from the last data.iteritems()
-    plt.plot(value[:, 0], f_RH['average'], label='average without Aitken Sulphate', color='black')
+    # plt.plot(value[:, 0], f_RH['average'], label='average without Aitken Sulphate', color='black')
+    plt.plot(value[:, 0], f_RH['average'], label='average', color='black')
 
 
     plt.legend(fontsize=9, loc='best')
-    plt.xlabel('RH')
+    plt.xlabel('RH', labelpad=0)
     plt.ylabel(Q_type + ' f(RH)')
-    plt.ylim([0, 8.0])
-    plt.title(file_name + ': 320-690nm band')
-    plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_320-690nm.png')
-    # plt.title(file_name + ': 690-1190nm band')
-    # plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_690-1190nm.png')
+    plt.ylim([0.0, 8.0])
+    plt.xlim([0.0, 1.0])
+    plt.title(file_name + ': ' + band_lam_range + ' band')
+    plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_' + band_lam_range + '.png')
+    plt.tight_layout()
 
 
 if __name__ == '__main__':
