@@ -13,6 +13,8 @@ import numpy as np
 import datetime as dt
 from scipy.stats import spearmanr
 
+from copy import deepcopy
+
 import ellUtils as eu
 from mod_obs_stats_plot import unique_pairs
 from forward_operator import FOUtils as FO
@@ -110,9 +112,9 @@ def create_stats_summary_dict_med(site_id, summary={}):
     if site_id not in summary:
 
         # define site based lists to store the correlation results in
-        summary[site_id] = {'median': nanArray, 'q25': nanArray,
-                               'q75': nanArray,
-                               'IQR': nanArray,
+        summary[site_id] = {'median': deepcopy(nanArray), 'q25': deepcopy(nanArray),
+                               'q75': deepcopy(nanArray),
+                               'IQR': deepcopy(nanArray),
                                'hrs': hrs}
 
     return summary
@@ -181,7 +183,7 @@ def nearest_heights(mod_height, obs_height, corr_max_height):
     return obs_hc_unique_pairs, mod_hc_unique_pairs, \
            pairs_hc_unique_values, pairs_hc_unique_diff
 
-def summary_statistics_mean(stat_i,site_i, hr, stat_data_hr):
+def summary_statistics_mean(stat_i, site_i, hr, stat_data_hr):
 
     """
     Calculate the summary statistics for this hour.
@@ -203,7 +205,7 @@ def summary_statistics_mean(stat_i,site_i, hr, stat_data_hr):
 
     return stat_i
 
-def summary_statistics_med(stat_i,site_i, hr, stat_data_hr):
+def summary_statistics_med(stat_i, site_i, site_stats_i):
 
     """
     Calculate the summary statistics for this hour.
@@ -214,16 +216,18 @@ def summary_statistics_med(stat_i,site_i, hr, stat_data_hr):
     :return: stat_i
     """
 
-    hridx = int(hr)
+    for hr, stat_data_hr in site_stats_i.iteritems():
 
-    stat_i[site_i]['median'][hridx] = np.nanmedian(stat_data_hr)
+        hridx = int(hr)
 
-    nanFree = np.array(stat_data_hr)[~np.isnan(np.array(stat_data_hr))]
+        stat_i[site_i]['median'][hridx] = deepcopy(np.nanmedian(stat_data_hr))
 
-    stat_i[site_i]['q25'][hridx] = np.percentile(nanFree, 25)
-    stat_i[site_i]['q75'][hridx] = np.percentile(nanFree, 75)
+        nanFree = np.array(deepcopy(stat_data_hr))[~np.isnan(np.array(deepcopy(stat_data_hr)))]
 
-    stat_i[site_i]['IQR'][hridx] = stat_i[site_i]['q75'] - stat_i[site_i]['q25']
+        stat_i[site_i]['q25'][hridx] = np.percentile(nanFree, 25)
+        stat_i[site_i]['q75'][hridx] = np.percentile(nanFree, 75)
+
+        stat_i[site_i]['IQR'][hridx] = np.percentile(nanFree, 75) - np.percentile(nanFree, 25)
 
 
     return stat_i
@@ -380,6 +384,11 @@ def main():
 
     print '\n' + 'Gathering statistics...'
 
+    corr = {}
+    diff = {}
+    rmse = {}
+    sampleSize = {}
+
     for site_i, site_stats in statistics.iteritems():
 
         # setup site within the summary statistics
@@ -387,17 +396,14 @@ def main():
         rmse = create_stats_summary_dict_med(site_i, rmse)
         diff = create_stats_summary_dict_med(site_i, diff)
 
-        for stat, stat_data_all_hrs in site_stats.iteritems():
+        # carry out statistics
+        corr = summary_statistics_med(corr, site_i, site_stats['r'])
+        diff = summary_statistics_med(diff, site_i, site_stats['diff'])
+        rmse = summary_statistics_med(rmse, site_i, site_stats['RMSE'])
 
-            for hr, stat_data_hr in stat_data_all_hrs.iteritems():
-
-                corr = summary_statistics_med(corr, site_i, hr, stat_data_hr)
-                rmse = summary_statistics_med(rmse, site_i, hr, stat_data_hr)
-                diff = summary_statistics_med(diff, site_i, hr, stat_data_hr)
-
-                #corr = summary_statistics_mean(corr, site_i, hr, stat_data_hr)
-                #rmse = summary_statistics_mean(rmse, site_i, hr, stat_data_hr)
-                #diff = summary_statistics_mean(diff, site_i, hr, stat_data_hr)
+        #corr = summary_statistics_mean(corr, site_i, hr, stat_data_hr)
+        #rmse = summary_statistics_mean(rmse, site_i, hr, stat_data_hr)
+        #diff = summary_statistics_mean(diff, site_i, hr, stat_data_hr)
 
     # for site_i, site_stats in statistics.iteritems():
     #
