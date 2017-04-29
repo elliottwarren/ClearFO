@@ -57,6 +57,65 @@ def create_stats_entry(site_id, statistics={}):
 
     return statistics
 
+def create_stats_summary_dict_mean(site_id, summary={}):
+
+    """
+    Define or expand the almighty summary statistics array
+    summary will be a dictionary for a different statistic e.g. corr or rmse
+
+    :param site_id:
+    :param summary:
+    :return: summary
+    """
+
+    # statistics will be grouped based on hour, so create a simple hourly array [0 ... 23]
+    hrs = np.arange(0, 24)
+
+    # define nanArray
+    # idea is to preestablish the array size, so it can be indexed into. When the statistic is made for that hour,
+    # it can be placed in the correct position. If the stat cannot be made, the idx will remain nan.
+    nanArray = np.empty(24)
+    nanArray[:] = np.nan
+
+    if site_id not in summary:
+
+        # define site based lists to store the correlation results in
+        summary[site_id] = {'mean': nanArray, 'mean_plus_stdev': nanArray,
+                               'mean_minus_stdev': nanArray,
+                               'stdev': nanArray,
+                               'hrs': hrs}
+
+    return summary
+
+def create_stats_summary_dict_med(site_id, summary={}):
+
+    """
+    Define or expand the almighty summary statistics array
+    summary will be a dictionary for a different statistic e.g. corr or rmse
+
+    :param site_id:
+    :param summary:
+    :return: summary
+    """
+
+    # statistics will be grouped based on hour, so create a simple hourly array [0 ... 23]
+    hrs = np.arange(0, 24)
+
+    # define nanArray
+    # idea is to preestablish the array size, so it can be indexed into. When the statistic is made for that hour,
+    # it can be placed in the correct position. If the stat cannot be made, the idx will remain nan.
+    nanArray = np.empty(24)
+    nanArray[:] = np.nan
+
+    if site_id not in summary:
+
+        # define site based lists to store the correlation results in
+        summary[site_id] = {'median': nanArray, 'q25': nanArray,
+                               'q75': nanArray,
+                               'IQR': nanArray,
+                               'hrs': hrs}
+
+    return summary
 
 def dateList_to_datetime(dayList):
 
@@ -122,6 +181,53 @@ def nearest_heights(mod_height, obs_height, corr_max_height):
     return obs_hc_unique_pairs, mod_hc_unique_pairs, \
            pairs_hc_unique_values, pairs_hc_unique_diff
 
+def summary_statistics_mean(stat_i,site_i, hr, stat_data_hr):
+
+    """
+    Calculate the summary statistics for this hour.
+    :param stat_i:
+    :param site_i:
+    :param hr:
+    :param stat_data_hr:
+    :return: stat_i
+    """
+
+    hridx = int(hr)
+
+    stat_i[site_i]['mean'][hridx] = np.nanmean(stat_data_hr)
+    stat_i[site_i]['stdev'][hridx] = np.nanstd(stat_data_hr)
+
+    stat_i[site_i]['mean_minus_stdev'][hridx] = stat_i[site_i]['mean'][hridx] - stat_i[site_i]['stdev'][hridx]
+    stat_i[site_i]['mean_plus_stdev'][hridx] = stat_i[site_i]['mean'][hridx] + stat_i[site_i]['stdev'][hridx]
+
+
+    return stat_i
+
+def summary_statistics_med(stat_i,site_i, hr, stat_data_hr):
+
+    """
+    Calculate the summary statistics for this hour.
+    :param stat_i:
+    :param site_i:
+    :param hr:
+    :param stat_data_hr:
+    :return: stat_i
+    """
+
+    hridx = int(hr)
+
+    stat_i[site_i]['median'][hridx] = np.nanmedian(stat_data_hr)
+
+    nanFree = np.array(stat_data_hr)[~np.isnan(np.array(stat_data_hr))]
+
+    stat_i[site_i]['q25'][hridx] = np.percentile(nanFree, 25)
+    stat_i[site_i]['q75'][hridx] = np.percentile(nanFree, 75)
+
+    stat_i[site_i]['IQR'][hridx] = stat_i[site_i]['q75'] - stat_i[site_i]['q25']
+
+
+    return stat_i
+
 def main():
 
     # ==============================================================================
@@ -171,8 +277,11 @@ def main():
     corr_max_height = 2000
 
     # define statistics dictionary
-    statistics={}
-
+    statistics = {}
+    corr = {}
+    diff = {}
+    rmse = {}
+    sampleSize = {}
 
 
     # ==============================================================================
@@ -222,8 +331,9 @@ def main():
 
             # create entry in the dictionary if one does not exist
             statistics = create_stats_entry(site_id, statistics)
-            stat_mean = create_stats_entry(site_id, stat_mean)
-            stat_mean = create_stats_entry(site_id, stat_mean)
+            #stat_mean  = create_stats_entry(site_id, stat_mean)
+            #stat_stdev = create_stats_entry(site_id, stat_stdev)
+            #stat_n = create_stats_entry(site_id, stat_n)
 
             # for each hour possible in the day
             for t in np.arange(0, 24):
@@ -257,7 +367,8 @@ def main():
 
                 if stats_diff == True:
 
-                    statistics[site_id]['diff'][hr] += [np.nanmean(np.log10(mod_y) - np.log10(obs_x))]
+                    statistics[site_id]['diff'][hr] += [np.nanmedian(np.log10(mod_y) - np.log10(obs_x))]
+                    # statistics[site_id]['diff'][hr] += [np.nanmean(np.log10(mod_y) - np.log10(obs_x))]
 
                 if stats_RMSE == True:
 
@@ -269,19 +380,86 @@ def main():
 
     print '\n' + 'Gathering statistics...'
 
-    if stats_diff == True:
+    for site_i, site_stats in statistics.iteritems():
 
-        for key, site_stats in statistics.iteritems():
+        # setup site within the summary statistics
+        corr = create_stats_summary_dict_med(site_i, corr)
+        rmse = create_stats_summary_dict_med(site_i, rmse)
+        diff = create_stats_summary_dict_med(site_i, diff)
 
-            for stat, stat_data_all_hrs in site_stats.iteritems():
+        for stat, stat_data_all_hrs in site_stats.iteritems():
 
-                for hr, stat_data_hr in stat_data_all_hrs.iteritems():
+            for hr, stat_data_hr in stat_data_all_hrs.iteritems():
 
-                    stat_mean[key][stat][hr]  = np.nanmean(stat_data_hr)
-                    stat_stdev[key][stat][hr] = np.nanstd(stat_data_hr)
+                corr = summary_statistics_med(corr, site_i, hr, stat_data_hr)
+                rmse = summary_statistics_med(rmse, site_i, hr, stat_data_hr)
+                diff = summary_statistics_med(diff, site_i, hr, stat_data_hr)
+
+                #corr = summary_statistics_mean(corr, site_i, hr, stat_data_hr)
+                #rmse = summary_statistics_mean(rmse, site_i, hr, stat_data_hr)
+                #diff = summary_statistics_mean(diff, site_i, hr, stat_data_hr)
+
+    # for site_i, site_stats in statistics.iteritems():
+    #
+    #     # setup site within the summary statistics
+    #     corr = create_stats_summary_dict_med(site_i, corr)
+    #     rmse = create_stats_summary_dict_med(site_i, rmse)
+    #     diff = create_stats_summary_dict_med(site_i, diff)
+    #
+    #     for stat, stat_data_all_hrs in site_stats.iteritems():
+    #
+    #         for hr, stat_data_hr in stat_data_all_hrs.iteritems():
+    #
+    #             corr = summary_statistics_med(corr, site_i, hr, stat_data_hr)
+    #             rmse = summary_statistics_med(rmse, site_i, hr, stat_data_hr)
+    #             diff = summary_statistics_med(diff, site_i, hr, stat_data_hr)
+    #
+    #             #corr = summary_statistics_mean(corr, site_i, hr, stat_data_hr)
+    #             #rmse = summary_statistics_mean(rmse, site_i, hr, stat_data_hr)
+    #             #diff = summary_statistics_mean(diff, site_i, hr, stat_data_hr)
 
 
+    # plot!
 
+    #"""
+    #plot the correlation statistics (\beta_m, site vs \beta_o, site) and save.#
+    #
+    #:return: fig
+    #"""
+
+    fig = plt.figure(figsize=(6, 3.5))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+
+    for site, site_summary in corr.iteritems():
+
+        # # mean
+        # ax.plot(site_summary['hrs'], site_summary['mean'],
+        #         label='mean', linewidth=1, ls='--', color=site_bsc_colours[site])
+        #
+        # # shade the range of stdev
+        # ax.fill_between(site_summary['hrs'], site_summary['mean_minus_stdev'], site_summary['mean_plus_stdev'],
+        #                 alpha=0.5, facecolor=site_bsc_colours[site])
+
+        # mean
+        ax.plot(site_summary['hrs'], site_summary['median'],
+                label='mean', linewidth=1, ls='--', color=site_bsc_colours[site])
+
+        # shade the range of stdev
+        ax.fill_between(site_summary['hrs'], site_summary['q25'], site_summary['q75'],
+                        alpha=0.2, facecolor=site_bsc_colours[site])
+
+    # # prettify
+    # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
+    ax.set_xlim(site_summary['hrs'].min(), site_summary['hrs'].max())
+    # ax.set_ylim([-0.5, 1])
+    ax.set_xlabel('Hour')
+    ax.set_ylabel(r'$Spearman \/\/\rho \/\/correlation$')
+    # ax.xaxis.set_major_formatter(DateFormatter('%d/ %H:%M'))
+    # ax.legend(loc='best', fontsize=8)
+
+    plt.savefig(savedir +'correlations/' +
+                      model_type + '_SpearCorrTs_' + 'clearDaysSample_' +
+                      str(corr_max_height) + 'm.png')  # filename
 
 
 
