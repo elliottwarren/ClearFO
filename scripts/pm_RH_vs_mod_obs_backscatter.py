@@ -5,12 +5,15 @@ Created by Elliott Tues 09/05/17
 """
 
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import matplotlib.cm
 
 import numpy as np
 import datetime as dt
 from scipy.stats import spearmanr
 
 from copy import deepcopy
+import colorsys
 
 import ellUtils as eu
 from mod_obs_stats_plot import unique_pairs
@@ -45,76 +48,17 @@ def create_stats_entry(site_id, statistics={}):
         # define site based lists to store the correlation results in
         statistics[site_id] = {'r': {}, 'p': {},
                                'diff': {},
+                               'aer_diff': {},
+                               'rh_diff': {},
+                               'back_point_diff': {},
                                'RMSE': {},
                                'MBE': {}}
 
-        for hr in hrs:
-            statistics[site_id]['r'][str(hr)] = []
-            statistics[site_id]['p'][str(hr)] = []
-            statistics[site_id]['diff'][str(hr)] = []
-            statistics[site_id]['RMSE'][str(hr)] = []
+        for key in statistics[site_id].iterkeys():
+            for hr in hrs:
+                statistics[site_id][key][str(hr)] = []
 
     return statistics
-
-def create_stats_summary_dict_mean(site_id, summary={}):
-
-    """
-    Define or expand the almighty summary statistics array
-    summary will be a dictionary for a different statistic e.g. corr or rmse
-
-    :param site_id:
-    :param summary:
-    :return: summary
-    """
-
-    # statistics will be grouped based on hour, so create a simple hourly array [0 ... 23]
-    hrs = np.arange(0, 24)
-
-    # define nanArray
-    # idea is to preestablish the array size, so it can be indexed into. When the statistic is made for that hour,
-    # it can be placed in the correct position. If the stat cannot be made, the idx will remain nan.
-    nanArray = np.empty(24)
-    nanArray[:] = np.nan
-
-    if site_id not in summary:
-
-        # define site based lists to store the correlation results in
-        summary[site_id] = {'mean': nanArray, 'mean_plus_stdev': nanArray,
-                               'mean_minus_stdev': nanArray,
-                               'stdev': nanArray,
-                               'hrs': hrs}
-
-    return summary
-
-def create_stats_summary_dict_med(site_id, summary={}):
-
-    """
-    Define or expand the almighty summary statistics array
-    summary will be a dictionary for a different statistic e.g. corr or rmse
-
-    :param site_id:
-    :param summary:
-    :return: summary
-    """
-
-    # statistics will be grouped based on hour, so create a simple hourly array [0 ... 23]
-    hrs = np.arange(0, 24)
-
-    # define nanArray
-    # idea is to preestablish the array size, so it can be indexed into. When the statistic is made for that hour,
-    # it can be placed in the correct position. If the stat cannot be made, the idx will remain nan.
-    nanArray = np.empty(24)
-    nanArray[:] = np.nan
-
-    if site_id not in summary:
-
-        # define site based lists to store the correlation results in
-        summary[site_id] = {'median': deepcopy(nanArray), 'q25': deepcopy(nanArray),
-                               'q75': deepcopy(nanArray),
-                               'IQR': deepcopy(nanArray),
-                               'hrs': hrs}
-
-    return summary
 
 def dateList_to_datetime(dayList):
 
@@ -128,213 +72,90 @@ def dateList_to_datetime(dayList):
 
     return datetimeDays
 
-def nearest_heights(mod_height, obs_height, corr_max_height):
+def get_nearest_ceil_mod_height_idx(mod_height, obs_height, ceil_gate_num):
 
     """
-    Get the nearest ceilometer height gate to each model level
+    Returns the ceilometer height index for the ceilometer gate number, and the idx for
+    the nearest model height.
 
     :param mod_height:
     :param obs_height:
-    :param corr_max_height:
-    :return:
-
-    obs_idx = ALL nearest gate idx
-    mod_idx = idx of the model height that each obs_idx are paired to
-    """
-
-
-    a = np.array([eu.nearest(obs_height, i) for i in mod_height])
-    values = a[:, 0]
-    obs_idx = np.array(a[:, 1], dtype=int)
-    diff = a[:, 2]
-    mod_idx = np.arange(len(mod_height))  # mod_idx should be paired with obs_idx spots.
-
-    # Trim off the ends of obs_idx, as UKV and obs z0 and zmax are different, leading to the same gate matching multiple ukvs
-    # assumes no duplicates in the middle of the arrays, just at the end
-
-    # At this point, variables are like:
-    # obs_idx = [0, 0, 0, 1, 3, 5, .... 769, 769, 769]
-    # mod_idx = [0, 1, 2, 3, 4, 4, .... 67,  68,  69 ]
-    unique_pairs_range = unique_pairs(obs_idx, diff)
-
-    # ALL unique pairs
-    # Use these to plot correlations for all possible pairs, regardless of height
-    obs_unique_pairs = obs_idx[unique_pairs_range]
-    mod_unique_pairs = mod_idx[unique_pairs_range]
-    values_unique_pairs = values[unique_pairs_range]
-    diff_unique_pairs = diff[unique_pairs_range]
-
-    # ~~~~~~~~~~~~~~~~~~~~ #
-
-    # Remove pairs where obs is above the max allowed height.
-    # hc = height cut
-    hc_unique_pairs_range = np.where(values_unique_pairs <= corr_max_height)[0]
-
-    # trim off unique pairs that are above the maximum height
-    obs_hc_unique_pairs = obs_unique_pairs[hc_unique_pairs_range]
-    mod_hc_unique_pairs = mod_unique_pairs[hc_unique_pairs_range]
-    pairs_hc_unique_values = values_unique_pairs[hc_unique_pairs_range]
-    pairs_hc_unique_diff = diff_unique_pairs[hc_unique_pairs_range]
-
-
-    return obs_hc_unique_pairs, mod_hc_unique_pairs, \
-           pairs_hc_unique_values, pairs_hc_unique_diff
-
-def summary_statistics_mean(stat_i, site_i, hr, stat_data_hr):
-
-    """
-    Calculate the summary statistics for this hour.
-    :param stat_i:
-    :param site_i:
-    :param hr:
-    :param stat_data_hr:
-    :return: stat_i
-    """
-
-    hridx = int(hr)
-
-    stat_i[site_i]['mean'][hridx] = np.nanmean(stat_data_hr)
-    stat_i[site_i]['stdev'][hridx] = np.nanstd(stat_data_hr)
-
-    stat_i[site_i]['mean_minus_stdev'][hridx] = stat_i[site_i]['mean'][hridx] - stat_i[site_i]['stdev'][hridx]
-    stat_i[site_i]['mean_plus_stdev'][hridx] = stat_i[site_i]['mean'][hridx] + stat_i[site_i]['stdev'][hridx]
-
-
-    return stat_i
-
-def summary_statistics_med(stat_i, site_i, site_stats_i):
-
-    """
-    Calculate the summary statistics for this hour.
-    :param stat_i:
-    :param site_i:
-    :param hr:
-    :param stat_data_hr:
-    :return: stat_i
-    """
-
-    for hr, stat_data_hr in site_stats_i.iteritems():
-
-        hridx = int(hr)
-
-        stat_i[site_i]['median'][hridx] = deepcopy(np.nanmedian(stat_data_hr))
-
-        nanFree = np.array(deepcopy(stat_data_hr))[~np.isnan(np.array(deepcopy(stat_data_hr)))]
-
-        stat_i[site_i]['q25'][hridx] = np.percentile(nanFree, 25)
-        stat_i[site_i]['q75'][hridx] = np.percentile(nanFree, 75)
-
-        stat_i[site_i]['IQR'][hridx] = np.percentile(nanFree, 75) - np.percentile(nanFree, 25)
-
-
-    return stat_i
-
-def plot_corr(stat, savedir, site_bsc_colours, model_type, corr_max_height):
-
-    """
-    Plot the median and IQR of the correlation
+    :param ceil_gate_num:
     :return:
     """
+
+    # idx and height for ceil
+    ceil_gate_idx = ceil_gate_num - 1
+
+    ceil_gate_height = obs_height[ceil_gate_idx]
+
+    # find nearest height and idx for mod
+    a = eu.nearest(mod_height, ceil_gate_height)
+
+    mod_pair_height = a[0]
+    mod_height_idx = a[1]
+    height_diff = a[2]
+
+
+    return ceil_gate_idx, mod_height_idx
+
+def plot_back_point_diff(var_diff, back_point_diff, savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type):
+
+    """
+    Plot the rh difference vs backscatter diff
+    :return:
+    """
+
+    rgb = colour_range(24)
 
     fig = plt.figure(figsize=(6, 3.5))
     ax = plt.subplot2grid((1, 1), (0, 0))
 
-    for site, site_summary in stat.iteritems():
+    # variable specific labels and names
+    if var_type == 'RH':
+        xlab = r'$Difference \/\mathrm{(RH_{ukv} - RH_{obs})}$'
 
-        # median
-        ax.plot(site_summary['hrs'], site_summary['median'],
-                label=site, linewidth=1, ls='--', color=site_bsc_colours[site])
+    elif var_type == 'aerosol':
+        xlab = r'$Difference \/\mathrm{(m_{MURK} - PM_{10})}$'
 
-        # shade IQR (25th - 75th percentile)
-        ax.fill_between(site_summary['hrs'], site_summary['q25'], site_summary['q75'],
-                        alpha=0.2, facecolor=site_bsc_colours[site])
+    for t in np.arange(0, 24):
 
-    # # prettify
-    # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
-    ax.set_xlim([0.0, 23.0])
-    # ax.set_ylim([-0.5, 1])
-    ax.set_xlabel('Hour')
-    ax.set_ylabel(r'$Spearman \/\/\rho \/\/correlation$')
-    ax.legend(loc='best', fontsize=8)
-    fig.suptitle('median and IQR')
+        hr = str(t)
+
+        hr_colour = rgb[t]
+
+        plt.scatter(var_diff[hr], back_point_diff[hr], color=hr_colour)
+
+    ax.set_xlabel(xlab)
+    ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
+
+    # Fake a ScalarMappable so I can display a colormap
+    cmap, norm = mcolors.from_levels_and_colors(range(24 + 1), rgb)
+    sm = matplotlib.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    fig.colorbar(sm)
+
+    fig.suptitle(ceil + '; n = ' + str(sampleSize) + '; r = ' + '{:1.2f}'.format(corr['r']) +
+                 '; p = ' + '%1.2f' % corr['p'])
     plt.tight_layout()
-
-    plt.savefig(savedir +'correlations/' +
-                      model_type + '_SpearCorrTs_' + 'clearDaysSample_med_IQR_' +
-                      str(corr_max_height) + 'm.png')  # filename
-
+    plt.subplots_adjust(top=0.90)
+    plt.savefig(savedir + 'point_diff/' +
+                model_type + '_' + var_type + '_diff_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '.png')  # filename
 
     return fig
 
-def plot_rmse(stat, savedir, site_bsc_colours, model_type):
+def colour_range(num_colours=24.0):
 
-        """
-        Plot the median and IQR of the rmse
-        :return:
-        """
+    """Makes a simple range of colours"""
 
-        fig = plt.figure(figsize=(6, 3.5))
-        ax = plt.subplot2grid((1, 1), (0, 0))
+    for i in range(num_colours):
 
-        for site, site_summary in stat.iteritems():
-            # median
-            ax.plot(site_summary['hrs'], site_summary['median'],
-                    label=site, linewidth=1, ls='--', color=site_bsc_colours[site])
+        rgb = [colorsys.hsv_to_rgb(i / 72., 1.0, 1.0) for i in range(num_colours)]
 
-            # shade IQR (25th - 75th percentile)
-            ax.fill_between(site_summary['hrs'], site_summary['q25'], site_summary['q75'],
-                            alpha=0.2, facecolor=site_bsc_colours[site])
+        # rgb = colorsys.hsv_to_rgb(i / 72.0, 1.0, 1.0)
+        # print(i, [round(255 * x) for x in rgb])
 
-        # # prettify
-        # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
-        ax.set_xlim([0.0, 23.0])
-        # ax.set_ylim([-0.5, 1])
-        ax.set_xlabel('Hour')
-        ax.set_ylabel('RMSE')
-        ax.legend(loc='best', fontsize=8)
-        fig.suptitle('median and IQR')
-        plt.tight_layout()
-        plt.savefig(savedir + 'rmse/' +
-                    model_type + '_rmse_' + 'clearDaysSample_med_IQR.png')  # filename
-
-        return fig
-
-def plot_diff(stat, savedir, site_bsc_colours, model_type):
-    """
-    Plot the median and IQR of the diff
-    :return:
-    """
-
-    fig = plt.figure(figsize=(6, 3.5))
-    ax = plt.subplot2grid((1, 1), (0, 0))
-
-    for site, site_summary in stat.iteritems():
-        # median
-        ax.semilogy(site_summary['hrs'], site_summary['median'],
-                label=site, linewidth=1, ls='--', color=site_bsc_colours[site])
-
-        # shade IQR (25th - 75th percentile)
-        ax.fill_between(site_summary['hrs'], site_summary['q25'], site_summary['q75'],
-                        alpha=0.2, facecolor=site_bsc_colours[site])
-
-    # # prettify
-    # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
-    ax.set_xlim([0.0, 23.0])
-    ax.set_ylim([0.0, 50.0])
-    ax.set_xlabel('Hour')
-    # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
-    ax.set_ylabel('obs_x / mod_y')
-    ax.legend(loc='best', fontsize=8)
-    # fig.suptitle('median and IQR')
-    plt.tight_layout()
-    plt.savefig(savedir + 'diff/' +
-                model_type + '_difference_normal_' + 'clearDaysSample_med_IQR.png')  # filename
-
-    return fig
-
-
-
-
+        return rgb
 
 def main():
 
@@ -357,39 +178,60 @@ def main():
     rhDatadir = datadir + 'L1/'
     aerDatadir = datadir + 'LAQN/'
 
+    # # instruments and other settings
+    # # site_rh = FOcon.site_rh
+    # site_rh = {'Davis_IMU': 72.8}
+    # rh_instrument = site_rh.keys()[0]
+    #
+    # site = 'IMU'
+    # ceil_id = 'CL31-A'
+    # ceil = ceil_id + '_BSC_' + site
+
     # instruments and other settings
-    site_bsc = FOcon.site_bsc
-    site_rh = FOcon.site_rh
-    site_aer = FOcon.site_aer
+    # site_rh = FOcon.site_rh
+    #site_rh = {'Davis_IMU': 72.8}
+    #rh_instrument = site_rh.keys()[0]
+
+    site = 'MR'
+    ceil_id = 'CL31-C'
+    ceil = ceil_id + '_BSC_' + site
+
+    # site_bsc = {ceil: FOcon.site_bsc[ceil], 'CL31-E_BSC_NK': 27.0 - 23.2}
+    site_bsc = {ceil: FOcon.site_bsc[ceil]}
+    site_aer = {'PM10_'+site: FOcon.site_aer['PM10_'+site]}
+
     site_bsc_colours = FOcon.site_bsc_colours
 
     # day list
-    # full list
-    #daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-    #              '20161129', '20161130', '20161204', '20170120', '20170122', '20170325', '20170408']
-
-    # current list
+    # clear sky days (5 Feb 2015 - 31 Dec 2016)
     daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-                  '20161129']
+                  '20161129', '20161130', '20161204']
 
-    # daystrList = ['20160504', '20160505']
+    # # KSS45W days
+    # daystrList = ['20150414', '20150415', '20150421', '20150611']
+
+    # IMU days
+    #daystrList = ['20160504', '20160823', '20160911', '20161125',
+    #              '20161129', '20161130', '20161204']
 
     days_iterate = dateList_to_datetime(daystrList)
 
     # statistics to run
-    stats_corr = True
-    stats_diff = True
-    stats_RMSE = True
+    pm10_stats = True
+    rh_stats = False
 
     # correlation max height
     corr_max_height = 2000
 
+    # ceilometer gate number to use for backscatter comparison
+    # 1 - noisy
+    # 2 - more stable
+    # see Kotthaus et al (2016) for more.
+    ceil_gate_num = 2
+
     # define statistics dictionary
     statistics = {}
-    corr = {}
-    diff = {}
-    rmse = {}
-    sampleSize = {}
+    sampleSize = 0 # add to this
 
 
     # ==============================================================================
@@ -418,94 +260,94 @@ def main():
         # ToDo Remove the time sampling part and put it into its own function further down.
         bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data)
 
+        if pm10_stats == True:
+            # read in PM10 data and extract data for the current day
+            pm10 = FO.read_pm10_obs(site_aer, aerDatadir, mod_data)
+
+        # read in RH data
+        if rh_stats == True:
+            rh_obs = FO.read_all_rh_obs(day, site_rh, rhDatadir, mod_data)
+
         # ==============================================================================
         # Process
         # ==============================================================================
 
-        # requires model data to be at ceilometer location!
-        for site, bsc_site_obs in bsc_obs.iteritems():
+        # extract the single site out of bsc_obs
+        # if ceil in bsc_obs:
+        #     bsc_site_obs = bsc_obs[ceil]
+        # else:
+        #     bsc_site_obs = bsc_obs['CL31-E_BSC_NK']
 
-            # short site id that matches the model id
-            site_id = site.split('_')[-1]
-            print '     Processing for site: ' + site_id
+        bsc_site_obs = bsc_obs[ceil]
 
-            # Get unique height pairs between obs and model
-            # each height is only paired up once
-            # heights above a maximum limit are cut (define by corr_max_height)
+        # short site id that matches the model id
+        site_id = site.split('_')[-1]
+        print '     Processing for site: ' + site_id
 
-            obs_hc_unique_pairs, mod_hc_unique_pairs, \
-            pairs_hc_unique_values, pairs_hc_unique_diff = \
-                nearest_heights(mod_data[site_id]['level_height'], bsc_site_obs['height'], corr_max_height)
+        # get the ceilometer and model height index for the define ceilometer range gate
+        mod_rh_height_idx = eu.nearest(mod_data[site]['level_height'], site_rh[rh_instrument])[1]
 
-            # create entry in the dictionary if one does not exist
-            statistics = create_stats_entry(site_id, statistics)
-            #stat_mean  = create_stats_entry(site_id, stat_mean)
-            #stat_stdev = create_stats_entry(site_id, stat_stdev)
-            #stat_n = create_stats_entry(site_id, stat_n)
+        ceil_height_idx, mod_height_idx =\
+             get_nearest_ceil_mod_height_idx(mod_data[site_id]['level_height'], bsc_site_obs['height'], ceil_gate_num)
 
-            # for each hour possible in the day
-            for t in np.arange(0, 24):
+        # create entry in the dictionary if one does not exist
+        statistics = create_stats_entry(site_id, statistics)
 
-                hr = str(t)
+        # for each hour possible in the day
+        for t in np.arange(0, 24):
 
-                # extract out all unique pairs below the upper height limit
-                # these are time and height matched now
-                obs_x = bsc_site_obs['backscatter'][t, obs_hc_unique_pairs]
-                mod_y = mod_data[site_id]['backscatter'][t, mod_hc_unique_pairs]
+            hr = str(t)
 
-                # STATISTICS
-                # ---------------
+            # extract out all unique pairs below the upper height limit
+            # these are time and height matched now
+            #obs_x = bsc_site_obs['backscatter'][t, obs_hc_unique_pairs]
+            #mod_y = mod_data[site_id]['backscatter'][t, mod_hc_unique_pairs]
 
-                # store time
-                # statistics[site_id]['time'] += [mod_data[site_id]['time'][t]]
+            # extract pairs of values used in statistics
+            if pm10_stats == True:
+                pm10_i = pm10['PM10_'+site]['pm_10'][t]
+                murk_i = mod_data[site]['aerosol_for_visibility'][t, 0] # 0th height = 5 m
 
-                # Correlations
-                if stats_corr == True:
+            if rh_stats == True:
+                rh_obs_i = rh_obs[rh_instrument]['RH'][t]
+                rh_mod_i = mod_data[site]['RH'][t, mod_rh_height_idx] * 100.0 # convert from [fraction] to [%]
 
-                    # correlate and store
-                    # if number of remaining pairs is too low, set r and p to nan
-                    try:
-                        r, p = spearmanr(np.log10(obs_x), np.log10(mod_y), nan_policy='omit')
-                    except:
-                        r = np.nan
-                        p = np.nan
+            obs_back_i = bsc_site_obs['backscatter'][t, ceil_height_idx]
+            mod_back_i = mod_data[site]['backscatter'][t, mod_height_idx]
 
-                    statistics[site_id]['r'][hr] += [r]
-                    statistics[site_id]['p'][hr] += [p]
+            # STATISTICS
+            # ---------------
 
-                if stats_diff == True:
+            # length of aer_diff[hr] and ['back_point_diff'] hour should and MUST be the same length
+            # such that their idx positions line up
+            if pm10_stats == True:
+                statistics[site_id]['aer_diff'][hr] += [murk_i - pm10_i]
 
-                    # statistics[site_id]['diff'][hr] += [np.nanmedian(np.log10(mod_y) - np.log10(obs_x))]
-                    statistics[site_id]['diff'][hr] += [np.nanmedian(obs_x / mod_y)]
-                    # statistics[site_id]['diff'][hr] += [np.nanmean(np.log10(mod_y) - np.log10(obs_x))]
+                # if the difference pairs do not posses an NaN (and will therefore be plotted), add 1 to sample size
+                if ~np.isnan(murk_i - pm10_i) & ~np.isnan(np.log10(mod_back_i) - np.log10(obs_back_i)):
+                    sampleSize += 1
 
-                if stats_RMSE == True:
+            if rh_stats == True:
+                statistics[site_id]['rh_diff'][hr] += [rh_mod_i - rh_obs_i]
 
-                    statistics[site_id]['RMSE'][hr] += [eu.rmse(np.log10(mod_y), np.log10(obs_x))]
+                # if the difference pairs do not posses an NaN (and will therefore be plotted), add 1 to sample size
+                if ~np.isnan(rh_mod_i - rh_obs_i) & ~np.isnan(np.log10(mod_back_i) - np.log10(obs_back_i)):
+                    sampleSize += 1
+
+
+
+            statistics[site_id]['back_point_diff'][hr] += [np.log10(mod_back_i) - np.log10(obs_back_i)]
+
 
 
     # gather up statistics...
-    # create a mean and standard deviation for each hour for plotting
 
-    print '\n' + 'Gathering statistics...'
 
+    # do correlation
     corr = {}
-    diff = {}
-    rmse = {}
-    sampleSize = {}
-
-    for site_i, site_stats in statistics.iteritems():
-
-        # setup site within the summary statistics
-        corr = create_stats_summary_dict_med(site_i, corr)
-        rmse = create_stats_summary_dict_med(site_i, rmse)
-        diff = create_stats_summary_dict_med(site_i, diff)
-
-        # carry out statistics
-        corr = summary_statistics_med(corr, site_i, site_stats['r'])
-        diff = summary_statistics_med(diff, site_i, site_stats['diff'])
-        rmse = summary_statistics_med(rmse, site_i, site_stats['RMSE'])
-
+    corr['rh_diff_all'] = [i for sublist in statistics[site_id]['rh_diff'].values() for i in sublist]
+    corr['back_diff_all'] = [i for sublist in statistics[site_id]['back_point_diff'].values() for i in sublist]
+    corr['r'], corr['p'] = spearmanr(corr['rh_diff_all'], corr['back_diff_all'], nan_policy='omit')
 
     # plot!
 
@@ -515,9 +357,14 @@ def main():
     #:return: fig
     #"""
 
-    fig = plot_corr(corr, savedir, site_bsc_colours, model_type, corr_max_height)
-    fig = plot_rmse(rmse, savedir, site_bsc_colours, model_type)
-    fig = plot_diff(diff, savedir, site_bsc_colours, model_type)
+#    fig = plot_diff(diff, savedir, site_bsc_colours, model_type)
+    if pm10_stats == True:
+        fig = plot_back_point_diff(statistics[site_id]['aer_diff'], statistics[site_id]['back_point_diff'],
+                                   savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type='aerosol')
+
+    if rh_stats == True:
+        fig = plot_back_point_diff(statistics[site_id]['rh_diff'], statistics[site_id]['back_point_diff'],
+                                   savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type='RH')
 
 
     plt.close('all')
