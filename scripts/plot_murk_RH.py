@@ -6,24 +6,17 @@ Created by Elliott 10/10/2016
 """
 
 import matplotlib.pyplot as plt
-from matplotlib.dates import date2num
 from matplotlib.dates import DateFormatter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from cycler import cycler
 import numpy as np
-import scipy.io as sp
-import math
 import datetime as dt
 
-import ceilUtils as ceil
-import cristinaCeilUtils as cutils
 from ellUtils import add_at
 import ellUtils as eu
 
 import cartopy.crs as ccrs
 import iris
-import iris.fileformats.pp as pp
-from netCDF4 import Dataset
 
 def main():
 
@@ -35,24 +28,27 @@ def main():
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
     datadir = maindir + 'data/'
 
+    # days to loop between [YYYY, MM, DD]
+    dayStart = dt.datetime(2016, 05, 03)
+    dayEnd = dt.datetime(2016, 05, 05)
 
-    # days to loop between
-    dayStart = 125
-    dayEnd = 127
+    # dayStart = 125
+    # dayEnd = 127
 
     # year date for ceil data
     year = 2016
 
     # which modelled data to read in and directories
     model_type = 'UKV'
+
+    mod_datadir = datadir + model_type + '/'
     savedir = maindir + 'figures/' + model_type + '/'
 
     # model resolution
     if model_type == 'UKV':
         res = '1p5km'
     elif model_type == '333m':
-        res = '0p3'
-
+        res = '0p3km'
 
     # -------------------------------------
     # Read
@@ -70,13 +66,22 @@ def main():
     for i in ceil_rawmeta[1:]:
         ceil_metadata[i[1]] = [float(i[3]), float(i[4])]
 
-    for day in dayStart:
+    # datetime range to iterate over
+    if dayStart != dayEnd:
+        days_iterate = eu.date_range(dayStart, dayEnd, 1, 'days')
+    else:
+        days_iterate = [dayStart]
+
+    for day in days_iterate:
+
+        # date string
+        dateStr = day.strftime('%Y%m%d')
 
         # temp filename for the day
-        mod_filename = 'extract_prodm_op_ukv_20160504_21_full.nc'
+        mod_filename = 'extract_prodm_op_ukv_' + dateStr + '_21_full.nc'
 
         # concatenate the names
-        mod_fname = datadir + mod_filename
+        mod_fname = mod_datadir + mod_filename
 
         # Read in the modelled data for London
         mod_data = eu.netCDF_read(mod_fname)
@@ -137,6 +142,8 @@ def main():
             mod_glon, idx_lon, diff_lon = eu.nearest(mod_data['longitude'], glon)
             mod_glat, idx_lat, diff_lat = eu.nearest(mod_data['latitude'], glat)
 
+            print ""
+            print site + ' - idx_lon = ' + str(idx_lon) + '; idx_lat = ' + str(idx_lat)
 
             # extract the variables for that location
             mod_aer = mod_data['aerosol_for_visibility'][:, :, idx_lat, idx_lon]
@@ -173,10 +180,19 @@ def main():
             # RH
             fig, ax = plt.subplots(2, 1, figsize=(8, 5))
             im_rh = ax[0].pcolormesh(mod_data['time'], mod_data['level_height'], np.transpose(100.0 * rh), vmin=0, vmax=100)
-            im_aer = ax[1].pcolormesh(mod_data['time'], mod_data['level_height'], np.transpose(mod_aer), vmin=0, vmax=150)
+            im_aer = ax[1].pcolormesh(mod_data['time'], mod_data['level_height'], np.transpose(mod_aer), vmin=0, vmax=50)
 
             # adjust subplots to fit colour bars
             plt.subplots_adjust(right=0.8)
+
+            # colourbars
+            divider = make_axes_locatable(ax[0])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im_rh, cax=cax)
+
+            divider = make_axes_locatable(ax[1])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im_aer, cax=cax)
 
             # # set up colour bars
             # pos = ax[0].get_position()._get_extents()
@@ -188,25 +204,27 @@ def main():
             # fig.colorbar(im_aer, cax=aer_cax)
 
             # prettify
+            fig.suptitle(site + ' - 21Z forecast, start: ' + day.strftime('%d/%m/%Y'))
             ax0 = eu.fig_majorAxis(fig)
             ax0.set_xlabel('Time [HH:MM]', fontsize=fs)
             ax0.set_ylabel('Height [m]', fontsize=fs)
 
-            ax[0].set_ylim([0, 8000])
-            ax[0].axis('tight')
-            ax[1].set_ylim([0, 8000])
-            ax[1].set_yticklabels('')
-            ax[1].axis('tight')
+            ax[0].set_ylim([0, 2500])
+            ax[0].xaxis.set_major_formatter(DateFormatter('%H:%M'))
+            ax[1].set_ylim([0, 2500])
+            ax[1].xaxis.set_major_formatter(DateFormatter('%H:%M'))
+            # ax[1].set_yticklabels('')
+            # ax[1].axis('tight')
             plt.tight_layout()
 
             # adjust label position, needs to be done after tight_layout() because it doesn't work well with
             # separate overlaying axis
             ax0.yaxis.set_label_coords(-0.08, 0.5)
-            ax0.xaxis.set_label_coords(0.4, -0.15)
+            # ax0.xaxis.set_label_coords(0.4, -0.15)
 
             # alphabet label subplots
-            add_at(ax[0], 'a)', loc=2)
-            add_at(ax[1], 'b)', loc=2)
+            add_at(ax[0], 'RH', loc=2)
+            add_at(ax[1], 'MURK aerosol', loc=2)
 
             # colourbar
             # cax, kw = mpl.colorbar.make_axes([ax for ax in ax.flat], aspect=12)
@@ -214,10 +232,12 @@ def main():
 
             # save
             plt.savefig(savedir + 'dailyPlots/' +
-                        model_type + '_' + site + '_RH_MMR_' + str(day) + 'raw.png')  # filename
+                        model_type + '-' + site + '-RH_MMR_' + dateStr + '_raw.png')  # filename
 
 
             plt.close(fig)
+
+    print 'END PROGRAM'
 
     return
 
