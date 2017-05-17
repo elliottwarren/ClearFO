@@ -178,10 +178,14 @@ def main():
     rhDatadir = datadir + 'L1/'
     aerDatadir = datadir + 'LAQN/'
 
+    # statistics to run
+    pm10_stats = False
+    rh_stats = True
+
     # # instruments and other settings
     # # site_rh = FOcon.site_rh
-    # site_rh = {'Davis_IMU': 72.8}
-    # rh_instrument = site_rh.keys()[0]
+    site_rh = {'WXT_KSSW': 50.3}
+    rh_instrument = site_rh.keys()[0]
     #
     # site = 'IMU'
     # ceil_id = 'CL31-A'
@@ -192,23 +196,31 @@ def main():
     #site_rh = {'Davis_IMU': 72.8}
     #rh_instrument = site_rh.keys()[0]
 
-    site = 'MR'
-    ceil_id = 'CL31-C'
+
+    site = 'KSS45W'
+    ceil_id = 'CL31-A'
     ceil = ceil_id + '_BSC_' + site
 
-    # site_bsc = {ceil: FOcon.site_bsc[ceil], 'CL31-E_BSC_NK': 27.0 - 23.2}
     site_bsc = {ceil: FOcon.site_bsc[ceil]}
-    site_aer = {'PM10_'+site: FOcon.site_aer['PM10_'+site]}
+    # site_bsc = {ceil: FOcon.site_bsc[ceil], 'CL31-E_BSC_NK': 27.0 - 23.2}
+
+    if pm10_stats == True:
+        site_aer = {'PM10_'+site: FOcon.site_aer['PM10_'+site]}
+
+    if rh_stats == True:
+        site_rh = {'WXT_KSSW': 50.3}
+        rh_instrument = site_rh.keys()[0]
+
 
     site_bsc_colours = FOcon.site_bsc_colours
 
     # day list
     # clear sky days (5 Feb 2015 - 31 Dec 2016)
-    daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-                  '20161129', '20161130', '20161204']
+    #daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+    #              '20161129', '20161130', '20161204']
 
     # # KSS45W days
-    # daystrList = ['20150414', '20150415', '20150421', '20150611']
+    daystrList = ['20150414', '20150415', '20150421', '20150611']
 
     # IMU days
     #daystrList = ['20160504', '20160823', '20160911', '20161125',
@@ -216,9 +228,7 @@ def main():
 
     days_iterate = dateList_to_datetime(daystrList)
 
-    # statistics to run
-    pm10_stats = True
-    rh_stats = False
+
 
     # correlation max height
     corr_max_height = 2000
@@ -285,7 +295,8 @@ def main():
         print '     Processing for site: ' + site_id
 
         # get the ceilometer and model height index for the define ceilometer range gate
-        mod_rh_height_idx = eu.nearest(mod_data[site]['level_height'], site_rh[rh_instrument])[1]
+        if rh_stats == True:
+            mod_rh_height_idx = eu.nearest(mod_data[site]['level_height'], site_rh[rh_instrument])[1]
 
         ceil_height_idx, mod_height_idx =\
              get_nearest_ceil_mod_height_idx(mod_data[site_id]['level_height'], bsc_site_obs['height'], ceil_gate_num)
@@ -344,10 +355,17 @@ def main():
 
 
     # do correlation
-    corr = {}
-    corr['rh_diff_all'] = [i for sublist in statistics[site_id]['rh_diff'].values() for i in sublist]
-    corr['back_diff_all'] = [i for sublist in statistics[site_id]['back_point_diff'].values() for i in sublist]
-    corr['r'], corr['p'] = spearmanr(corr['rh_diff_all'], corr['back_diff_all'], nan_policy='omit')
+    if rh_stats == True:
+        corr = {}
+        corr['rh_diff_all'] = [i for sublist in statistics[site_id]['rh_diff'].values() for i in sublist]
+        corr['back_diff_all'] = [i for sublist in statistics[site_id]['back_point_diff'].values() for i in sublist]
+        corr['r'], corr['p'] = spearmanr(corr['rh_diff_all'], corr['back_diff_all'], nan_policy='omit')
+
+    if pm10_stats == True:
+        corr = {}
+        corr['aer_diff_all'] = [i for sublist in statistics[site_id]['aer_diff'].values() for i in sublist]
+        corr['back_diff_all'] = [i for sublist in statistics[site_id]['back_point_diff'].values() for i in sublist]
+        corr['r'], corr['p'] = spearmanr(corr['aer_diff_all'], corr['back_diff_all'], nan_policy='omit')
 
     # plot!
 
