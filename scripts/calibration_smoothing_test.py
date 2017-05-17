@@ -5,6 +5,7 @@ Created on 15/05/17 by EW
 """
 
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from matplotlib.dates import date2num
 from matplotlib.dates import DateFormatter
 from pm_RH_vs_mod_obs_backscatter import dateList_to_datetime
@@ -29,7 +30,7 @@ def read_cal():
         # read in calibration
 
         calib[key] = {'Dates': item.Dates, 'wv_cal': np.array(item.C_modes_wv),
-                      'samples': item.profile_total}
+                      'samples': np.array(item.profile_total)}
 
     return calib
 
@@ -130,7 +131,7 @@ def remove_events(periods, window_trans_daily):
 
     return window_trans_daily
 
-def calc_daily_window_trans(window_trans, calib_dates_days, calib_raw):
+def calc_daily_window_trans(window_trans, calib_dates_days, calib):
 
     """
     Calculate the daily maximum window transmission, and pair it with the calibration coefficient that factors in
@@ -173,7 +174,7 @@ def calc_daily_window_trans(window_trans, calib_dates_days, calib_raw):
 
         # store c for the day
         if cIdx[0].size != 0:
-            window_trans_daily['c_wv'][dayIdx] = calib_raw[cIdx]
+            window_trans_daily['c_wv'][dayIdx] = calib['wv_cal'][cIdx]
 
 
         # get c
@@ -181,10 +182,24 @@ def calc_daily_window_trans(window_trans, calib_dates_days, calib_raw):
 
         # store c for the day
         if sIdx[0].size != 0:
-            window_trans_daily['samples'][dayIdx] = calib_raw[sIdx]
+            window_trans_daily['samples'][dayIdx] = calib['samples'][sIdx]
 
 
     return window_trans_daily
+
+# plotting
+
+def plot_hist(window_trans_daily):
+
+    """very fast histogram plot of sample size"""
+
+    data = window_trans_daily['samples'][~np.isnan(window_trans_daily['samples'])]
+    fig = plt.figure()
+    plt.hist(data, bins=50)
+    plt.savefig(savedir + '/' + site + '/samplesize.png')
+    plt.close(fig)
+
+    return
 
 def plot_smooth(dates, calibration, ma_7, ma_10, ma_30):
 
@@ -278,7 +293,8 @@ def scatter_window_c_period(window_trans_daily, site, savedir, startDay, endDay)
     # scatter plot for the calibration data. daily max window trans vs calibration factor.
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
-    ax.scatter(window_trans_daily['max_window'], window_trans_daily['c_wv'], c = window_trans_daily['sample'], color='g')
+    p = ax.scatter(window_trans_daily['max_window'], window_trans_daily['c_wv'], c = window_trans_daily['samples'],
+                   vmin= 0, vmax=2500, cmap=cm.jet)
 
     # add a linear fit to the plot
     m, b = eu.linear_fit_plot(window_trans_daily['max_window'], window_trans_daily['c_wv'], ax, ls='-', color='black')
@@ -299,6 +315,13 @@ def scatter_window_c_period(window_trans_daily, site, savedir, startDay, endDay)
         xlim[0] = 90.0
         xlim[1] = 100.0
 
+    # remove top and right axis but keep lables
+    #ax.spines['right'].set_visible(False)
+    #ax.spines['top'].set_visible(False)
+    ax.yaxis.set_ticks_position('left')
+    ax.xaxis.set_ticks_position('bottom')
+
+    p.set_clip_on(False)
     ax.set_ylim(ylim)
     ax.set_xlim(xlim)
     # ax.xaxis.set_major_formatter(DateFormatter('%m/%y'))
@@ -306,6 +329,7 @@ def scatter_window_c_period(window_trans_daily, site, savedir, startDay, endDay)
     ax.set_xlabel('Window transmission (daily max) [%]')
     ax.set_ylabel('water vapour C')
     plt.suptitle(site + '; ' + eqstr + '\n' + period_range_str)
+    plt.colorbar(p)
     plt.legend()
 
     plt.savefig(savedir + '/' + site + '/rawCalib_vs_maxWindow_daily_' + period_range_str + '_' + site + '.png')
@@ -358,15 +382,22 @@ if __name__ == '__main__':
         # this site calibration data
         calib = calib_all[site_id]
 
+        # ==============================================================================
+        # Read data
+        # ==============================================================================
+
         # read periods
         periods = read_periods(perioddatadir, site_id)
 
         # read transmission
         window_trans = read_window_trans(site, ceildatadir)
 
-
         # read pulse energy
         pulse = read_pulse(site, ceildatadir)
+
+        # ==============================================================================
+        # Process
+        # ==============================================================================
 
         # turn dates into datetimes
         calib_dates = dateList_to_datetime_calib_format(calib['Dates'])
@@ -376,13 +407,16 @@ if __name__ == '__main__':
         # calibration = eu.linear_interpolation(data['wv_cal'])
 
         # mask raw data
-        calib_raw = np.ma.masked_where(np.isnan(calib['wv_cal']), calib['wv_cal'])
+        # calib_raw = np.ma.masked_where(np.isnan(calib['wv_cal']), calib['wv_cal'])
 
         # create  time series of dailymax window transmission
-        window_trans_daily = calc_daily_window_trans(window_trans, calib_dates_days, calib_raw)
+        window_trans_daily = calc_daily_window_trans(window_trans, calib_dates_days, calib)
 
         # remove event days from window transmission (firmware, hardware, cleaing etc)
         window_trans_daily = remove_events(periods, window_trans_daily)
+
+        # very quick plot histogram of sample size
+        plot_hist(window_trans_daily)
 
 
         # remove transmission enteries in periods
