@@ -65,7 +65,7 @@ def read_aer_data(file_path, aer_index, aer_order, band=4):
     :param file_path:
     :param aer_index:
     :param aer_order:
-    :param Q_type:
+    :param band
     :return:
     """
 
@@ -229,6 +229,7 @@ def main():
     # save f(RH)
     # np.savetxt(datadir +  'calculated_ext_f(RH)_'+str(ceil_lam)+'nm.csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
     np.savetxt(f_RHdir +  file_name + '_ext_f(RH)_' + band_lam_range + '.csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
+
     # ---------------------------------------------------
     # Plotting
     # ---------------------------------------------------
@@ -252,8 +253,9 @@ def main():
     plt.ylim([0.0, 8.0])
     plt.xlim([0.0, 1.0])
     plt.title(file_name + ': ' + band_lam_range + ' band')
+    plt.tight_layout() # moved tight_layout above... was originally after the save (06/04/17)
     plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_' + band_lam_range + '.png')
-    plt.tight_layout()
+
 
 
 if __name__ == '__main__':
