@@ -13,10 +13,23 @@ from matplotlib.dates import DateFormatter
 
 import numpy as np
 import datetime as dt
+import os
 
 import ellUtils as eu
 from forward_operator import FOUtils as FO
 from forward_operator import FOconstants as FOcon
+
+def dateList_to_datetime(dayList):
+
+    """ Convert list of string dates into datetimes """
+
+    datetimeDays = []
+
+    for d in dayList:
+
+        datetimeDays += [dt.datetime(int(d[0:4]), int(d[4:6]), int(d[6:8]))]
+
+    return datetimeDays
 
 # Plotting
 
@@ -97,7 +110,7 @@ def rh_profile_plot(ax, site_rh, rh_obs, mod_data, site_bsc_colours, t):
     for site, height in site_rh.iteritems():
 
         # currently no label, so it can be added manually later
-        ax.scatter(rh_obs[site]['RH'][t], height, label=site, color='green', edgecolors='black')
+        ax.scatter(rh_obs[site]['RH'][t], height, label=site, color='green', edgecolors='black', s=120)
 
     # plot reference line
     ax.plot([38.0, 38.0], [0, 10000], color='black', ls='--')
@@ -137,7 +150,7 @@ def aer_profile_plot(ax, site_aer, pm10_obs, mod_data, site_bsc_colours, t):
     # plot obs pm10 ontop of lines
     for site, height in site_aer.iteritems():
 
-        ax.scatter(pm10_obs[site]['pm_10'][t], height, label=site, color='red', edgecolors='black')
+        ax.scatter(pm10_obs[site]['pm_10'][t], height, label=site, color='red', edgecolors='black', s=120)
 
     # prettify
     ax.set_ylim([0, 2000])
@@ -250,7 +263,7 @@ def main():
     # directories
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
     datadir = maindir + 'data/'
-    savedir = maindir + 'figures/' + model_type + '/'
+    savedir = maindir + 'figures/' + model_type + '/profiles/'
 
     # data
     ceilDatadir = datadir + 'L1/'
@@ -264,10 +277,19 @@ def main():
     site_aer = FOcon.site_aer
     site_bsc_colours = FOcon.site_bsc_colours
 
-    # days to loop between
+    # sites to run for
+
+    # days to loop between - original clear sky case study
+    # dayStart = dt.datetime(2016, 05, 04)
+    # dayEnd = dt.datetime(2016, 05, 06)
+
     dayStart = dt.datetime(2016, 05, 04)
     dayEnd = dt.datetime(2016, 05, 06)
 
+    daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+                  '20161129', '20161130', '20161204']
+
+    days_iterate = dateList_to_datetime(daystrList)
 
     # ==============================================================================
     # Read and process modelled data
@@ -275,14 +297,11 @@ def main():
 
     # 1. Read Ceilometer metadata
     # ----------------------------
-    ceil_metadata = FO.read_ceil_metadata(datadir)
-
-    # 2. Read calibration data
-    # ----------------------------
+    ceil_metadata = FO.read_ceil_metadata(datadir, loc_filename='CeilsCSVclearFO.csv')
 
 
     # datetime range to iterate over
-    days_iterate = eu.date_range(dayStart, dayEnd, 1, 'days')
+    # days_iterate = eu.date_range(dayStart, dayEnd, 1, 'days')
 
     for day in days_iterate:
 
@@ -305,7 +324,7 @@ def main():
         # 4. Read PM10
         # ------------------------
 
-        pm10_obs = FO.read_all_pm10_obs(dayStart, dayEnd, site_aer, aerDatadir, mod_data)
+        pm10_obs = FO.read_pm10_obs(site_aer, aerDatadir, mod_data)
 
 
 
@@ -315,21 +334,23 @@ def main():
         bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data)
 
 
-        # do any stats on time reduced data here...
-        # ToDo move this out
-        #for key, calib in ceil_calib.iteritems():
-        #    bsc_obs[key]['backscatter'] *= calib
+        # only keep mod data where ceilometer data also exists
+        bsc_sites_present = [i.split('_')[-1] for i in bsc_obs.keys()]
+        keys = mod_data.keys()
+        for key in keys:
+            if (key in bsc_sites_present) == False:
+                del mod_data[key]
 
         # ==============================================================================
         # Plotting
         # ==============================================================================
 
-        for t in np.arange(len(bsc_obs['CL31-A_BSC_IMU']['time'])):
+        for t in np.arange(len(mod_data.values()[0]['time'])):
 
             print t
 
             # current hour as string
-            t_hr = bsc_obs['CL31-A_BSC_IMU']['time'][t]
+            t_hr = mod_data.values()[0]['time'][t]
 
             # set up plot
             fig = plt.figure(figsize=(10, 7))
@@ -379,7 +400,9 @@ def main():
             ax5.legend(fontsize=8, bbox_to_anchor=(1.01, 1), loc=2, borderaxespad=0.0)
 
             # save the figure
-            plt.savefig(savedir + 'profiles/' + 'BscRhAer_' + model_type + '_' + t_hr.strftime("%Y%m%d_%H%M") + '.png')
+            if (os.path.exists(savedir + day.strftime("%Y%m%d"))) == False:
+                os.mkdir(savedir + day.strftime("%Y%m%d"))
+            plt.savefig(savedir + day.strftime("%Y%m%d") + '/BscRhAer_' + model_type + '_' + t_hr.strftime("%Y%m%d_%H%M") + '.png')
 
             # close figure
             plt.close(fig)
