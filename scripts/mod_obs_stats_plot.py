@@ -12,7 +12,6 @@ import numpy as np
 import datetime as dt
 from scipy.stats import spearmanr
 
-import ceilUtils as ceil
 import ellUtils as eu
 from forward_operator import FOUtils as FO
 from forward_operator import FOconstants as FOcon
@@ -108,7 +107,7 @@ def plot_correlations(savedir, model_type, statistics, corr_max_height):
     :return: fig
     """
 
-    fig = plt.figure(figsize=(8, 5))
+    fig = plt.figure(figsize=(8, 3.5))
     ax = plt.subplot2grid((1, 1), (0, 0))
 
     for site, data in statistics.iteritems():
