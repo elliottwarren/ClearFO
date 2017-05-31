@@ -183,23 +183,24 @@ def main():
     rh_stats = True
 
     # # instruments and other settings
-    # # site_rh = FOcon.site_rh
-    site_rh = {'WXT_KSSW': 50.3}
-    rh_instrument = site_rh.keys()[0]
-    #
-    # site = 'IMU'
-    # ceil_id = 'CL31-A'
-    # ceil = ceil_id + '_BSC_' + site
-
-    # instruments and other settings
-    # site_rh = FOcon.site_rh
-    #site_rh = {'Davis_IMU': 72.8}
+    #site_rh = FOcon.site_rh
+    #site_rh = {'WXT_KSSW': 50.3}
     #rh_instrument = site_rh.keys()[0]
 
-
-    site = 'KSS45W'
+    site = 'IMU'
     ceil_id = 'CL31-A'
-    ceil = ceil_id + '_BSC_' + site
+    ceil = ceil_id + '_' + site
+
+    # instruments and other settings
+    site_rh = FOcon.site_rh
+    site_rh = {'Davis_IMU': 72.8}
+    rh_instrument = site_rh.keys()[0]
+
+
+    # site = 'KSS45W'
+    # ceil_id = 'CL31-A'
+    # ceil = ceil_id + '_BSC_' + site
+    # ceil = ceil_id + '_' + site
 
     site_bsc = {ceil: FOcon.site_bsc[ceil]}
     # site_bsc = {ceil: FOcon.site_bsc[ceil], 'CL31-E_BSC_NK': 27.0 - 23.2}
@@ -216,15 +217,22 @@ def main():
 
     # day list
     # clear sky days (5 Feb 2015 - 31 Dec 2016)
-    #daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-    #              '20161129', '20161130', '20161204']
+    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+    #               '20161129', '20161130', '20161204']
 
-    # # KSS45W days
-    daystrList = ['20150414', '20150415', '20150421', '20150611']
+    # KSS45W days
+    # daystrList = ['20150414', '20150415', '20150421', '20150611']
+
+    # # MR calib days
+    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+    #               '20161129', '20161130', '20161204']
+
+    # NK_D calib days
+    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504']
 
     # IMU days
-    #daystrList = ['20160504', '20160823', '20160911', '20161125',
-    #              '20161129', '20161130', '20161204']
+    daystrList = ['20160504', '20160823', '20160911', '20161125',
+                  '20161129', '20161130', '20161204']
 
     days_iterate = dateList_to_datetime(daystrList)
 
@@ -268,7 +276,9 @@ def main():
 
         # will only read in data is the site is there!
         # ToDo Remove the time sampling part and put it into its own function further down.
-        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data)
+        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=False)
+
+        bsc_obs_uncal = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=False)
 
         if pm10_stats == True:
             # read in PM10 data and extract data for the current day
@@ -288,66 +298,68 @@ def main():
         # else:
         #     bsc_site_obs = bsc_obs['CL31-E_BSC_NK']
 
-        bsc_site_obs = bsc_obs[ceil]
+        if ceil in bsc_obs:
 
-        # short site id that matches the model id
-        site_id = site.split('_')[-1]
-        print '     Processing for site: ' + site_id
+            bsc_site_obs = bsc_obs[ceil]
 
-        # get the ceilometer and model height index for the define ceilometer range gate
-        if rh_stats == True:
-            mod_rh_height_idx = eu.nearest(mod_data[site]['level_height'], site_rh[rh_instrument])[1]
+            # short site id that matches the model id
+            site_id = site.split('_')[-1]
+            print '     Processing for site: ' + site_id
 
-        ceil_height_idx, mod_height_idx =\
-             get_nearest_ceil_mod_height_idx(mod_data[site_id]['level_height'], bsc_site_obs['height'], ceil_gate_num)
-
-        # create entry in the dictionary if one does not exist
-        statistics = create_stats_entry(site_id, statistics)
-
-        # for each hour possible in the day
-        for t in np.arange(0, 24):
-
-            hr = str(t)
-
-            # extract out all unique pairs below the upper height limit
-            # these are time and height matched now
-            #obs_x = bsc_site_obs['backscatter'][t, obs_hc_unique_pairs]
-            #mod_y = mod_data[site_id]['backscatter'][t, mod_hc_unique_pairs]
-
-            # extract pairs of values used in statistics
-            if pm10_stats == True:
-                pm10_i = pm10['PM10_'+site]['pm_10'][t]
-                murk_i = mod_data[site]['aerosol_for_visibility'][t, 0] # 0th height = 5 m
-
+            # get the ceilometer and model height index for the define ceilometer range gate
             if rh_stats == True:
-                rh_obs_i = rh_obs[rh_instrument]['RH'][t]
-                rh_mod_i = mod_data[site]['RH'][t, mod_rh_height_idx] * 100.0 # convert from [fraction] to [%]
+                mod_rh_height_idx = eu.nearest(mod_data[site]['level_height'], site_rh[rh_instrument])[1]
 
-            obs_back_i = bsc_site_obs['backscatter'][t, ceil_height_idx]
-            mod_back_i = mod_data[site]['backscatter'][t, mod_height_idx]
+            ceil_height_idx, mod_height_idx =\
+                 get_nearest_ceil_mod_height_idx(mod_data[site_id]['level_height'], bsc_site_obs['height'], ceil_gate_num)
 
-            # STATISTICS
-            # ---------------
+            # create entry in the dictionary if one does not exist
+            statistics = create_stats_entry(site_id, statistics)
 
-            # length of aer_diff[hr] and ['back_point_diff'] hour should and MUST be the same length
-            # such that their idx positions line up
-            if pm10_stats == True:
-                statistics[site_id]['aer_diff'][hr] += [murk_i - pm10_i]
+            # for each hour possible in the day
+            for t in np.arange(0, 24):
 
-                # if the difference pairs do not posses an NaN (and will therefore be plotted), add 1 to sample size
-                if ~np.isnan(murk_i - pm10_i) & ~np.isnan(np.log10(mod_back_i) - np.log10(obs_back_i)):
-                    sampleSize += 1
+                hr = str(t)
 
-            if rh_stats == True:
-                statistics[site_id]['rh_diff'][hr] += [rh_mod_i - rh_obs_i]
+                # extract out all unique pairs below the upper height limit
+                # these are time and height matched now
+                #obs_x = bsc_site_obs['backscatter'][t, obs_hc_unique_pairs]
+                #mod_y = mod_data[site_id]['backscatter'][t, mod_hc_unique_pairs]
 
-                # if the difference pairs do not posses an NaN (and will therefore be plotted), add 1 to sample size
-                if ~np.isnan(rh_mod_i - rh_obs_i) & ~np.isnan(np.log10(mod_back_i) - np.log10(obs_back_i)):
-                    sampleSize += 1
+                # extract pairs of values used in statistics
+                if pm10_stats == True:
+                    pm10_i = pm10['PM10_'+site]['pm_10'][t]
+                    murk_i = mod_data[site]['aerosol_for_visibility'][t, 0] # 0th height = 5 m
+
+                if rh_stats == True:
+                    rh_obs_i = rh_obs[rh_instrument]['RH'][t]
+                    rh_mod_i = mod_data[site]['RH'][t, mod_rh_height_idx] * 100.0 # convert from [fraction] to [%]
+
+                obs_back_i = bsc_site_obs['backscatter'][t, ceil_height_idx]
+                mod_back_i = mod_data[site]['backscatter'][t, mod_height_idx]
+
+                # STATISTICS
+                # ---------------
+
+                # length of aer_diff[hr] and ['back_point_diff'] hour should and MUST be the same length
+                # such that their idx positions line up
+                if pm10_stats == True:
+                    statistics[site_id]['aer_diff'][hr] += [murk_i - pm10_i]
+
+                    # if the difference pairs do not posses an NaN (and will therefore be plotted), add 1 to sample size
+                    if ~np.isnan(murk_i - pm10_i) & ~np.isnan(np.log10(mod_back_i) - np.log10(obs_back_i)):
+                        sampleSize += 1
+
+                if rh_stats == True:
+                    statistics[site_id]['rh_diff'][hr] += [rh_mod_i - rh_obs_i]
+
+                    # if the difference pairs do not posses an NaN (and will therefore be plotted), add 1 to sample size
+                    if ~np.isnan(rh_mod_i - rh_obs_i) & ~np.isnan(np.log10(mod_back_i) - np.log10(obs_back_i)):
+                        sampleSize += 1
 
 
 
-            statistics[site_id]['back_point_diff'][hr] += [np.log10(mod_back_i) - np.log10(obs_back_i)]
+                statistics[site_id]['back_point_diff'][hr] += [np.log10(mod_back_i) - np.log10(obs_back_i)]
 
 
 
