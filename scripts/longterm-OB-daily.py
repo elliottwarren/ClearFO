@@ -232,6 +232,113 @@ def summary_statistics_med(stat_i, site_i, site_stats_i):
 
     return stat_i
 
+def plot_corr(stat, savedir, site_bsc_colours, model_type, corr_max_height):
+
+    """
+    Plot the median and IQR of the correlation
+    :return:
+    """
+
+    fig = plt.figure(figsize=(6, 3.5))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+
+    for site, site_summary in stat.iteritems():
+
+        # median
+        ax.plot(site_summary['hrs'], site_summary['median'],
+                label=site, linewidth=1, ls='--', color=site_bsc_colours[site])
+
+        # shade IQR (25th - 75th percentile)
+        ax.fill_between(site_summary['hrs'], site_summary['q25'], site_summary['q75'],
+                        alpha=0.2, facecolor=site_bsc_colours[site])
+
+    # # prettify
+    # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
+    ax.set_xlim([0.0, 23.0])
+    # ax.set_ylim([-0.5, 1])
+    ax.set_xlabel('Hour')
+    ax.set_ylabel(r'$Spearman \/\/\rho \/\/correlation$')
+    ax.legend(loc='best', fontsize=8)
+    fig.suptitle('median and IQR')
+    plt.tight_layout()
+
+    plt.savefig(savedir +'correlations/' +
+                      model_type + '_SpearCorrTs_' + 'clearDaysSample_med_IQR_' +
+                      str(corr_max_height) + 'm.png')  # filename
+
+
+    return fig
+
+def plot_rmse(stat, savedir, site_bsc_colours, model_type):
+
+        """
+        Plot the median and IQR of the rmse
+        :return:
+        """
+
+        fig = plt.figure(figsize=(6, 3.5))
+        ax = plt.subplot2grid((1, 1), (0, 0))
+
+        for site, site_summary in stat.iteritems():
+            # median
+            ax.plot(site_summary['hrs'], site_summary['median'],
+                    label=site, linewidth=1, ls='--', color=site_bsc_colours[site])
+
+            # shade IQR (25th - 75th percentile)
+            ax.fill_between(site_summary['hrs'], site_summary['q25'], site_summary['q75'],
+                            alpha=0.2, facecolor=site_bsc_colours[site])
+
+        # # prettify
+        # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
+        ax.set_xlim([0.0, 23.0])
+        # ax.set_ylim([-0.5, 1])
+        ax.set_xlabel('Hour')
+        ax.set_ylabel('RMSE')
+        ax.legend(loc='best', fontsize=8)
+        fig.suptitle('median and IQR')
+        plt.tight_layout()
+        plt.savefig(savedir + 'rmse/' +
+                    model_type + '_rmse_' + 'clearDaysSample_med_IQR.png')  # filename
+
+        return fig
+
+def plot_diff(stat, savedir, site_bsc_colours, model_type):
+    """
+    Plot the median and IQR of the diff
+    :return:
+    """
+
+    fig = plt.figure(figsize=(6, 3.5))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+
+    for site, site_summary in stat.iteritems():
+        # median
+        ax.semilogy(site_summary['hrs'], site_summary['median'],
+                label=site, linewidth=1, ls='--', color=site_bsc_colours[site])
+
+        # shade IQR (25th - 75th percentile)
+        ax.fill_between(site_summary['hrs'], site_summary['q25'], site_summary['q75'],
+                        alpha=0.2, facecolor=site_bsc_colours[site])
+
+    # # prettify
+    # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
+    ax.set_xlim([0.0, 23.0])
+    ax.set_ylim([0.0, 50.0])
+    ax.set_xlabel('Hour')
+    # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
+    ax.set_ylabel('obs_x / mod_y')
+    ax.legend(loc='best', fontsize=8)
+    # fig.suptitle('median and IQR')
+    plt.tight_layout()
+    plt.savefig(savedir + 'diff/' +
+                model_type + '_difference_normal_' + 'clearDaysSample_med_IQR.png')  # filename
+
+    return fig
+
+
+
+
+
 def main():
 
     # ==============================================================================
@@ -245,7 +352,7 @@ def main():
     # directories
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
     datadir = maindir + 'data/'
-    savedir = maindir + 'figures/' + model_type + '/longterm/'
+    savedir = maindir + 'figures/' + model_type + '/clearSkyPeriod/'
 
     # data
     ceilDatadir = datadir + 'L1/'
@@ -371,7 +478,8 @@ def main():
 
                 if stats_diff == True:
 
-                    statistics[site_id]['diff'][hr] += [np.nanmedian(np.log10(mod_y) - np.log10(obs_x))]
+                    # statistics[site_id]['diff'][hr] += [np.nanmedian(np.log10(mod_y) - np.log10(obs_x))]
+                    statistics[site_id]['diff'][hr] += [np.nanmedian(obs_x / mod_y)]
                     # statistics[site_id]['diff'][hr] += [np.nanmean(np.log10(mod_y) - np.log10(obs_x))]
 
                 if stats_RMSE == True:
@@ -401,29 +509,6 @@ def main():
         diff = summary_statistics_med(diff, site_i, site_stats['diff'])
         rmse = summary_statistics_med(rmse, site_i, site_stats['RMSE'])
 
-        #corr = summary_statistics_mean(corr, site_i, hr, stat_data_hr)
-        #rmse = summary_statistics_mean(rmse, site_i, hr, stat_data_hr)
-        #diff = summary_statistics_mean(diff, site_i, hr, stat_data_hr)
-
-    # for site_i, site_stats in statistics.iteritems():
-    #
-    #     # setup site within the summary statistics
-    #     corr = create_stats_summary_dict_med(site_i, corr)
-    #     rmse = create_stats_summary_dict_med(site_i, rmse)
-    #     diff = create_stats_summary_dict_med(site_i, diff)
-    #
-    #     for stat, stat_data_all_hrs in site_stats.iteritems():
-    #
-    #         for hr, stat_data_hr in stat_data_all_hrs.iteritems():
-    #
-    #             corr = summary_statistics_med(corr, site_i, hr, stat_data_hr)
-    #             rmse = summary_statistics_med(rmse, site_i, hr, stat_data_hr)
-    #             diff = summary_statistics_med(diff, site_i, hr, stat_data_hr)
-    #
-    #             #corr = summary_statistics_mean(corr, site_i, hr, stat_data_hr)
-    #             #rmse = summary_statistics_mean(rmse, site_i, hr, stat_data_hr)
-    #             #diff = summary_statistics_mean(diff, site_i, hr, stat_data_hr)
-
 
     # plot!
 
@@ -433,43 +518,12 @@ def main():
     #:return: fig
     #"""
 
-    fig = plt.figure(figsize=(6, 3.5))
-    ax = plt.subplot2grid((1, 1), (0, 0))
-
-    for site, site_summary in corr.iteritems():
-
-        # # mean
-        # ax.plot(site_summary['hrs'], site_summary['mean'],
-        #         label='mean', linewidth=1, ls='--', color=site_bsc_colours[site])
-        #
-        # # shade the range of stdev
-        # ax.fill_between(site_summary['hrs'], site_summary['mean_minus_stdev'], site_summary['mean_plus_stdev'],
-        #                 alpha=0.5, facecolor=site_bsc_colours[site])
-
-        # mean
-        ax.plot(site_summary['hrs'], site_summary['median'],
-                label='mean', linewidth=1, ls='--', color=site_bsc_colours[site])
-
-        # shade the range of stdev
-        ax.fill_between(site_summary['hrs'], site_summary['q25'], site_summary['q75'],
-                        alpha=0.2, facecolor=site_bsc_colours[site])
-
-    # # prettify
-    # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
-    ax.set_xlim(site_summary['hrs'].min(), site_summary['hrs'].max())
-    # ax.set_ylim([-0.5, 1])
-    ax.set_xlabel('Hour')
-    ax.set_ylabel(r'$Spearman \/\/\rho \/\/correlation$')
-    # ax.xaxis.set_major_formatter(DateFormatter('%d/ %H:%M'))
-    # ax.legend(loc='best', fontsize=8)
-
-    plt.savefig(savedir +'correlations/' +
-                      model_type + '_SpearCorrTs_' + 'clearDaysSample_' +
-                      str(corr_max_height) + 'm.png')  # filename
+    fig = plot_corr(corr, savedir, site_bsc_colours, model_type, corr_max_height)
+    fig = plot_rmse(rmse, savedir, site_bsc_colours, model_type)
+    fig = plot_diff(diff, savedir, site_bsc_colours, model_type)
 
 
-
-
+    plt.close('all')
 
 
 
