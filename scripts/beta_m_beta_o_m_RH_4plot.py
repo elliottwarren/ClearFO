@@ -112,6 +112,9 @@ def main():
         # bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=True)
         bsc_obs = FO.read_ceil_obs_all(day, site_bsc, ceilDatadir)
 
+        # sub sampled in time
+        # bsc_obs_sub = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data)
+
 
         # # read in PM10 data and extract data for the current day
         # pm10 = FO.read_pm10_obs(site_aer, aerDatadir, matchModSample=False)
