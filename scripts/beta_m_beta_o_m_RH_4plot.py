@@ -13,11 +13,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import datetime as dt
 
-from copy import deepcopy
-import colorsys
-
 import ellUtils as eu
-import ceilUtils as ceil
 from forward_operator import FOUtils as FO
 from forward_operator import FOconstants as FOcon
 
@@ -100,6 +96,7 @@ def main():
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
     datadir = maindir + 'data/'
     savedir = maindir + 'figures/' + model_type + '/4panel/'
+    # savedir = maindir + 'figures/' + model_type + '/highPmCase/'
 
     # data
     ceilDatadir = datadir + 'L1/'
@@ -126,12 +123,14 @@ def main():
 
     site_bsc_colours = FOcon.site_bsc_colours
 
-    #daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
     #              '20161129', '20161130', '20161204']
-    #days_iterate = dateList_to_datetime(daystrList)
+    # days_iterate = dateList_to_datetime(daystrList)
 
     corr_max_height = 2000.0
 
+    # forecast data start time
+    Z='21'
 
     days_iterate = [dt.datetime(2016,01,19)]# new PM10 case study day
     # day = [dt.datetime(2016, 05, 04)] # one of my old case study days
@@ -154,10 +153,15 @@ def main():
         print 'day = ' + day.strftime('%Y-%m-%d')
 
         # Read UKV forecast and automatically run the FO
+        # multiply m by a coeff to modify it
+        m_coeff = np.ones((25, 70))
+        m_layer_coeff = 1.0
+        m_coeff[:, :5] = m_layer_coeff
 
         # extract MURK aerosol and calculate RH for each of the sites in the ceil metadata
         # reads all london model data, extracts site data, stores in single dictionary
-        mod_data = FO.mod_site_extract_calc(day, ceil_data_i, modDatadir, model_type, res, 910)
+        mod_data = FO.mod_site_extract_calc(day, ceil_data_i, modDatadir, model_type, res, 910,
+                                            m_coeff=m_coeff, Z=Z, version=0.2)
 
         # Read ceilometer backscatter
 
@@ -198,12 +202,15 @@ def main():
         obs_x = bsc_obs_sub[ceil_id_full]['backscatter'][:, obs_hc_unique_pairs]
         mod_y = mod_data[site]['backscatter'][:, mod_hc_unique_pairs]
 
-        mbe = np.log10(mod_y) - np.log10(obs_x)
-
+        # calculate MBE
+        mbe = mod_y - obs_x
+        ratio = mod_y / obs_x
+        # mbe = np.log10(mod_y) - np.log10(obs_x)
+        # a = mbe.flatten()[~np.isnan(mbe.flatten())]; hist(a) # show data in histogram
 
         # plot the data
         # 4 panel, beta_o, beta_m, m with pm10 overlay, rh with rh_obs (KSSW) overlay
-        fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(7, 6.5))
+        fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(8, 6.5))
 
         site_id = site.split('_')[-1]
 
@@ -213,21 +220,26 @@ def main():
 
         mesh1 = ax1.pcolormesh(bsc_obs[ceil_id_full]['time'], bsc_obs[ceil_id_full]['height'],
                                np.transpose(bsc_obs[ceil_id_full]['backscatter']),
-                                          norm=LogNorm(vmin=1e-7, vmax=1e-5), cmap=cm.get_cmap('jet'))
+                               norm=LogNorm(vmin=1e-7, vmax=1e-5), cmap=cm.get_cmap('jet'))
 
         # beta_m
         mesh2 = ax2.pcolormesh(mod_data[site_id]['time'], mod_data[site_id]['level_height'],
                                np.transpose(mod_data[site_id]['backscatter']),
-                                          norm=LogNorm(vmin=1e-7, vmax=1e-5), cmap=cm.get_cmap('jet'))
+                               norm=LogNorm(vmin=1e-7, vmax=1e-5), cmap=cm.get_cmap('jet')) # log10 = -7, -5
 
         # ax2.plot([mod_data[site_id]['time'][0],mod_data[site_id]['time'][-1]], [111.67, 111.67], ls='--', color='black')
 
         mesh3 = ax3.pcolormesh(mod_data[site_id]['time'], pairs_hc_unique_values,
-                               np.transpose(mbe), cmap=cm.get_cmap('jet'))
+                               np.transpose(mbe),
+                               norm=colors.SymLogNorm(linthresh=1e-7, linscale=0.03,
+                                                      vmin=-5e-6, vmax=5e-6), cmap=cm.get_cmap('coolwarm'))
+
+        # mesh3 = ax3.pcolormesh(mod_data[site_id]['time'], pairs_hc_unique_values,
+        #                        np.transpose(ratio), vmin=-3.0, vmax=3.0, cmap=cm.get_cmap('coolwarm'))
 
         # m
         mesh4 = ax4.pcolormesh(mod_data[site_id]['time'], mod_data[site_id]['level_height'], np.transpose(mod_data[site_id]['aerosol_for_visibility']),
-                                          vmin=0, vmax=30, cmap=cm.get_cmap('OrRd')) #  vmin=0, vmax=100
+                                          vmin=0, vmax=80, cmap=cm.get_cmap('OrRd')) #  vmin=0, vmax=100
 
         # RH
         mesh5 = ax5.pcolormesh(mod_data[site_id]['time'], mod_data[site_id]['level_height'], np.transpose(mod_data[site_id]['RH'])*100,
@@ -235,6 +247,7 @@ def main():
 
 
         plt.subplots_adjust(right=0.8)
+        plt.suptitle(str(Z) + 'Z: m =' + str(int(m_layer_coeff*100))+' %')
 
         # prettify
         for mesh, ax in zip((mesh1, mesh2, mesh3, mesh4, mesh5),(ax1, ax2, ax3, ax4, ax5)):
@@ -242,7 +255,7 @@ def main():
             ax.yaxis.label.set_size(10)
             ax.xaxis.label.set_size(10)
             ax.set_xlim([day, day + dt.timedelta(days=1)])
-            ax.set_ylim([0, 1000.0])
+            ax.set_ylim([0, 1500.0])
 
 
         divider = make_axes_locatable(ax1)
@@ -270,11 +283,13 @@ def main():
         ax3.get_xaxis().set_ticks([])
         ax4.get_xaxis().set_ticks([])
 
-        eu.add_at(ax1, r'$\beta_{o}$', loc=2)
-        eu.add_at(ax2, r'$\beta_{m}$', loc=2)
-        eu.add_at(ax3, r'$log_{10}(\beta_{m}) - log_{10}(\beta_{o})$', loc=2)
-        eu.add_at(ax4, r'$m$', loc=2)
-        eu.add_at(ax5, r'$RH$', loc=2)
+        eu.add_at(ax1, r'$a) \/\beta_{o}$', loc=2)
+        eu.add_at(ax2, r'$b) \/\beta_{m}$', loc=2)
+        # eu.add_at(ax3, r'$c) \/log_{10}(\beta_{m}) - log_{10}(\beta_{o})$', loc=2)
+        eu.add_at(ax3, r'$c) \/\beta_{m} - \beta_{o}$', loc=2)
+        # eu.add_at(ax3, r'$c) \/\beta_{m} / \beta_{o}$', loc=2)
+        eu.add_at(ax4, r'$d) \/m$', loc=2)
+        eu.add_at(ax5, r'$e) \/RH$', loc=2)
 
         ax0 = eu.fig_majorAxis(fig)
         ax0.set_xlabel('Time [HH:MM]', fontsize=10, labelpad=2)
@@ -282,7 +297,8 @@ def main():
 
         plt.tight_layout(h_pad=0.1)
 
-        plt.savefig(savedir + model_type + '-' + site + '-beta_o_beta_m_MBE_m_RH_' + day.strftime('%Y%m%d') + '.png')  # filename
+        plt.savefig(savedir + model_type + '-' + site + '-beta_o_beta_m_MBE_m_RH' + day.strftime('%Y%m%d') +
+                    '_' + str(Z) + 'Z_'+str(int(m_layer_coeff*100))+'_pct.png')  # filename
 
         plt.close(fig)
 
