@@ -6,6 +6,7 @@ Created by Elliott 30/05/17
 
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import matplotlib.colors as colors
 from matplotlib.colors import LogNorm
 from matplotlib.dates import DateFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -95,8 +96,8 @@ def main():
     # directories
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
     datadir = maindir + 'data/'
-    savedir = maindir + 'figures/' + model_type + '/4panel/'
-    # savedir = maindir + 'figures/' + model_type + '/highPmCase/'
+    # savedir = maindir + 'figures/' + model_type + '/4panel/'
+    savedir = maindir + 'figures/' + model_type + '/highPmCase/'
 
     # data
     ceilDatadir = datadir + 'L1/'
@@ -243,11 +244,11 @@ def main():
 
         # RH
         mesh5 = ax5.pcolormesh(mod_data[site_id]['time'], mod_data[site_id]['level_height'], np.transpose(mod_data[site_id]['RH'])*100,
-                                          cmap = cm.get_cmap('Blues'), vmin=20.0, vmax=100.0)
+                                          cmap = cm.get_cmap('Blues'), vmin=40.0, vmax=100.0)
 
 
         plt.subplots_adjust(right=0.8)
-        plt.suptitle(str(Z) + 'Z: m =' + str(int(m_layer_coeff*100))+' %')
+        # plt.suptitle(str(Z) + 'Z: m =' + str(int(m_layer_coeff*100))+' %')
 
         # prettify
         for mesh, ax in zip((mesh1, mesh2, mesh3, mesh4, mesh5),(ax1, ax2, ax3, ax4, ax5)):
@@ -255,7 +256,7 @@ def main():
             ax.yaxis.label.set_size(10)
             ax.xaxis.label.set_size(10)
             ax.set_xlim([day, day + dt.timedelta(days=1)])
-            ax.set_ylim([0, 1500.0])
+            ax.set_ylim([0, 1000.0])
 
 
         divider = make_axes_locatable(ax1)
@@ -269,6 +270,17 @@ def main():
         divider = make_axes_locatable(ax3)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(mesh3, cax=cax)
+
+        # correct labels in difference plot, as 0 overlaps with a couple of others
+        labels_orig = [item.get_text() for item in cax.get_yticklabels()]
+        labels = [i.replace(u'${-10^{-7}}$', u'') for i in labels_orig]
+        labels = [i.replace(u'${10^{-7}}$', u'') for i in labels]
+        # remove all but one instance of the 0
+        last = len(labels) - labels[::-1].index(u'${0}$') - 1
+        labels = [i.replace(u'${0}$', u'') for i in labels]
+        labels[last] = u'${0}$'
+        # set the labels
+        cax.set_yticklabels(labels)
 
         divider = make_axes_locatable(ax4)
         cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -297,8 +309,8 @@ def main():
 
         plt.tight_layout(h_pad=0.1)
 
-        plt.savefig(savedir + model_type + '-' + site + '-beta_o_beta_m_MBE_m_RH' + day.strftime('%Y%m%d') +
-                    '_' + str(Z) + 'Z_'+str(int(m_layer_coeff*100))+'_pct.png')  # filename
+        plt.savefig(savedir + model_type + '-' + site + '-beta_o_beta_m_MBE_m_RH_' + day.strftime('%Y%m%d') +
+                    '_' + str(Z) + 'Z_'+str(int(m_layer_coeff*100))+'_pct_v2.png')  # filename
 
         plt.close(fig)
 
