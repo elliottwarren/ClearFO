@@ -49,7 +49,11 @@ def create_stats_entry(site_id, statistics={}):
         statistics[site_id] = {'r': {}, 'p': {},
                                'diff': {},
                                'aer_diff': {},
+                               'aer_mod': {},
+                               'aer_obs': {},
                                'rh_diff': {},
+                               'rh_mod': {},
+                               'rh_obs': {},
                                'back_point_diff': {},
                                'RMSE': {},
                                'MBE': {}}
@@ -102,7 +106,7 @@ def get_nearest_ceil_mod_height_idx(mod_height, obs_height, ceil_gate_num):
 def plot_back_point_diff(var_diff, back_point_diff, savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type):
 
     """
-    Plot the rh difference vs backscatter diff
+    Plot the rh or aer difference vs backscatter diff
     :return:
     """
 
@@ -118,13 +122,12 @@ def plot_back_point_diff(var_diff, back_point_diff, savedir, model_type, ceil_ga
     elif var_type == 'aerosol':
         xlab = r'$Difference \/\mathrm{(m_{MURK} - PM_{10})}$'
 
+    # plot each hour
     for t in np.arange(0, 24):
 
         hr = str(t)
-
         hr_colour = rgb[t]
-
-        plt.scatter(var_diff[hr], back_point_diff[hr], color=hr_colour)
+        plt.scatter(var_diff[hr], back_point_diff[hr], color=hr_colour, s=6)
 
     ax.set_xlabel(xlab)
     ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
@@ -140,7 +143,56 @@ def plot_back_point_diff(var_diff, back_point_diff, savedir, model_type, ceil_ga
     plt.tight_layout()
     plt.subplots_adjust(top=0.90)
     plt.savefig(savedir + 'point_diff/' +
-                model_type + '_' + var_type + '_diff_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '.png')  # filename
+                model_type + '_' + var_type + '_diff_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + 'v0.2.png')  # filename
+
+    return fig
+
+def plot_back_point_diff_6hr(var_diff, back_point_diff, savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type):
+
+    """
+    Plot the rh or aer difference vs backscatter diff
+    :return:
+    """
+
+    rgb = colour_range(24)
+
+    fig = plt.figure(figsize=(6, 3.5))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+
+    # variable specific labels and names
+    if var_type == 'RH':
+        xlab = r'$Difference \/\mathrm{(RH_{ukv} - RH_{obs})}$'
+
+    elif var_type == 'aerosol':
+        xlab = r'$Difference \/\mathrm{(m_{MURK} - PM_{10})}$'
+
+    for t in [0,6,12,18]:
+
+        t_range = np.arange(t, t+6)
+
+        for t_i in t_range:
+
+            hr = str(t_i)
+
+            # hr_colour = rgb[t]
+
+            plt.scatter(var_diff[hr], back_point_diff[hr], s=4)
+
+        ax.set_xlabel(xlab)
+        ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
+
+        # # Fake a ScalarMappable so I can display a colormap
+        # cmap, norm = mcolors.from_levels_and_colors(range(6 + 1), rgb)
+        # sm = matplotlib.cm.ScalarMappable(cmap=cmap, norm=norm)
+        # sm.set_array([])
+        # fig.colorbar(sm)
+
+        fig.suptitle(ceil + '; n = ' + str(sampleSize) + '; r = ' + '{:1.2f}'.format(corr['r']) +
+                     '; p = ' + '%1.2f' % corr['p'])
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.90)
+        plt.savefig(savedir + 'point_diff/' +
+                    model_type + '_' + var_type + '_diff_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + 't'+str(t)+'.png')  # filename
 
     return fig
 
@@ -187,20 +239,20 @@ def main():
     #site_rh = {'WXT_KSSW': 50.3}
     #rh_instrument = site_rh.keys()[0]
 
-    site = 'IMU'
-    ceil_id = 'CL31-A'
-    ceil = ceil_id + '_' + site
+    #site = 'NK'
+    #ceil_id = 'CL31-D'
+    #ceil = ceil_id + '_' + site
 
     # instruments and other settings
-    site_rh = FOcon.site_rh
-    site_rh = {'Davis_IMU': 72.8}
-    rh_instrument = site_rh.keys()[0]
+    #site_rh = FOcon.site_rh
+    #site_rh = {'Davis_IMU': 72.8}
+    #rh_instrument = site_rh.keys()[0]
 
 
-    # site = 'KSS45W'
-    # ceil_id = 'CL31-A'
+    site = 'KSS45W'
+    ceil_id = 'CL31-A'
     # ceil = ceil_id + '_BSC_' + site
-    # ceil = ceil_id + '_' + site
+    ceil = ceil_id + '_' + site
 
     site_bsc = {ceil: FOcon.site_bsc[ceil]}
     # site_bsc = {ceil: FOcon.site_bsc[ceil], 'CL31-E_BSC_NK': 27.0 - 23.2}
@@ -221,18 +273,18 @@ def main():
     #               '20161129', '20161130', '20161204']
 
     # KSS45W days
-    # daystrList = ['20150414', '20150415', '20150421', '20150611']
+    daystrList = ['20150414', '20150415', '20150421', '20150611']
 
-    # # MR calib days
+    # MR calib days
     # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-    #               '20161129', '20161130', '20161204']
+    #              '20161129', '20161130', '20161204']
 
     # NK_D calib days
     # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504']
 
     # IMU days
-    daystrList = ['20160504', '20160823', '20160911', '20161125',
-                  '20161129', '20161130', '20161204']
+    # daystrList = ['20160504', '20160823', '20160911', '20161125',
+    #              '20161129', '20161130', '20161204']
 
     days_iterate = dateList_to_datetime(daystrList)
 
@@ -270,13 +322,13 @@ def main():
 
         # extract MURK aerosol and calculate RH for each of the sites in the ceil metadata
         # reads all london model data, extracts site data, stores in single dictionary
-        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910)
+        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910, version=0.2)
 
         # Read ceilometer backscatter
 
         # will only read in data is the site is there!
         # ToDo Remove the time sampling part and put it into its own function further down.
-        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=False)
+        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=True)
 
         bsc_obs_uncal = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=False)
 
@@ -358,9 +410,13 @@ def main():
                         sampleSize += 1
 
 
-
+                # all extra stats slots
                 statistics[site_id]['back_point_diff'][hr] += [np.log10(mod_back_i) - np.log10(obs_back_i)]
 
+                statistics[site_id]['aer_mod'][hr] += murk_i
+                statistics[site_id]['aer_obs'][hr] += pm10_i
+                statistics[site_id]['rh_mod'][hr]  += rh_mod_i
+                statistics[site_id]['rh_obs'][hr]  += rh_obs_i
 
 
     # gather up statistics...
