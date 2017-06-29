@@ -118,10 +118,6 @@ def main():
     site_bsc = {ceil_id_full: FOcon.site_bsc[ceil_id_full]}
     # site_bsc = {ceil: FOcon.site_bsc[ceil], 'CL31-E_BSC_NK': 27.0 - 23.2}
 
-    # site_aer = {'PM10_'+site: FOcon.site_aer['PM10_'+site]}
-
-    site_rh = {'WXT_KSSW': 50.3}
-    rh_instrument = site_rh.keys()[0]
 
     site_bsc_colours = FOcon.site_bsc_colours
 
@@ -172,8 +168,13 @@ def main():
         # bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=True)
         bsc_obs = FO.read_ceil_obs_all(day, site_bsc, ceilDatadir)
 
-        # sub sampled in time
+        # sub sampled in time to calculate the difference/ratio plot
         bsc_obs_sub = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data)
+
+        # BLH (Kotthaus and Grimmond, 2017)
+        datapath = datadir + 'L1/CL31-C_MLH_MR_2016019_15min.nc'
+        BLH = eu.netCDF_read(datapath, vars='')
+
 
         # # read in PM10 data and extract data for the current day
         # pm10 = FO.read_pm10_obs(site_aer, aerDatadir, matchModSample=False)
@@ -222,6 +223,8 @@ def main():
         mesh1 = ax1.pcolormesh(bsc_obs[ceil_id_full]['time'], bsc_obs[ceil_id_full]['height'],
                                np.transpose(bsc_obs[ceil_id_full]['backscatter']),
                                norm=LogNorm(vmin=1e-7, vmax=1e-5), cmap=cm.get_cmap('jet'))
+
+        ax1.plot_date(BLH['time'], BLH['MH'], marker='x', color='red')
 
         # beta_m
         mesh2 = ax2.pcolormesh(mod_data[site_id]['time'], mod_data[site_id]['level_height'],
