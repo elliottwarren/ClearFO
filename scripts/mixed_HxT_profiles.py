@@ -37,8 +37,8 @@ def main():
     modDatadir = datadir + model_type + '/'
 
     # instruments and other settings
-    site_bsc = FO.site_bsc
-    site_bsc_colours = FO.site_bsc_colours
+    site_bsc = FOcon.site_bsc
+    site_bsc_colours = FOcon.site_bsc_colours
 
     # day start and end
     dayStart = dt.datetime(2015, 04, 20)

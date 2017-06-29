@@ -48,7 +48,7 @@ def calc_Q_ext_wet(ceil_lam, r_md, RH):
         # temp file name
         miedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/'
         # filename = 'calculated_ext_f(RH)_' + str(ceil_lam) + 'nm.csv'
-        filename = 'sp_ew_910_ext_f(RH)_910-910nm.csv'
+        filename = 'sp_ew_ceil_guass_908-912_ext_f(RH)_908-912nm.csv'
 
         # read data
         raw = np.loadtxt(miedir + filename, delimiter=',')
@@ -186,7 +186,7 @@ def aer_ext_scat(q_aer, RH, r0 = FOcon.r0_haywood, p = FOcon.p_aer,
 
     # Calculate extinction coefficient
     # eqns. 17-18 in Clark et.al. (2008)
-    alpha_a = (eta * Q) * np.pi * N_aer * np.power(rm, 2)
+    alpha_a = (eta * Q) * np.pi * N_aer * np.power(r_md, 2)
 
     # Calculate backscatter using a constant lidar ratio
     beta_a = alpha_a / S
@@ -202,148 +202,6 @@ def aer_ext_scat(q_aer, RH, r0 = FOcon.r0_haywood, p = FOcon.p_aer,
            'f_RH': f_RH_matrix}
 
     return out
-
-def calc_aer_ext_vars(var_order, variables, q_aer_fix, RH_fix):
-
-    """
-    calculate the extinction coefficient for each of the input
-
-    :param variables:
-    :return: alpha, beta for all vars in var order
-    :return: alpha_c, beta_c for the control run with a fixed m and RH
-    :return: var order, so the variables will be plotted in order afterward.
-    """
-
-    # define dictionaries to store alpha and beta values in
-    alpha = {}
-    beta = {}
-    var_range = {}
-
-    for key, value in variables.iteritems():
-
-        # create ranges that have 100 elements in them
-        var_range[key] = create_range(value)
-
-    for key in var_order:
-
-        if key == 'RH':
-            out = aer_ext_scat(q_aer_fix, var_range[key])
-
-        elif key == 'm':
-            out = aer_ext_scat(var_range[key], RH_fix)
-        else:
-            # ** {key: var_range} = keyword argument unpacking
-            out = aer_ext_scat(q_aer_fix, RH_fix, **{key: var_range[key]})
-
-        # extract out the alpha and beta
-        alpha[key] = out['alpha']
-        beta[key] = out['beta']
-
-    # control
-    out_c = aer_ext_scat(q_aer_fix, RH_fix)
-    alpha_c = out_c['alpha']
-    beta_c = out_c['beta']
-
-    return alpha, beta, alpha_c, beta_c, var_range
-
-# plotting
-
-def plot_beta(var_order, beta, beta_c, variables, var_range, clearFo_dict, savestr):
-
-    """
-    plot the beta plot
-
-    :param var_order:
-    :param beta:
-    :param beta_c:
-    :param variables:
-    :param var_range:
-    :param clearFo_dict:
-    :return:
-    """
-
-    # set up plot
-    fig = plt.figure(figsize=(10, 6))
-    ax = plt.subplot2grid((27, 1), (0, 0), rowspan=26 - len(var_order))
-
-    for param in var_order:
-
-        value = beta[param]
-
-        if (param == 'RH') | (param == 'm'):
-            line, = ax.plot(np.arange(0, 101), np.log10(value[0:101]), label=variables[param][2],
-                            color=variables[param][3], linewidth=2)
-            line.set_dashes([10, 5, 100, 5])
-        else:
-            # 0:101 because computer rounding makes r0 have 102 enteries
-            ax.plot(np.arange(0, 101), np.log10(value[0:101]), label=variables[param][2], color=variables[param][3])
-
-    ax.plot([0, 100], [np.log10(beta_c), np.log10(beta_c)], label=r'$control$', color='black', linewidth=2, ls='--')
-
-    # adjust axis so the legends can be placed on the side
-    plt.tight_layout()
-    fig.subplots_adjust(top=0.95, right=0.80, left=0.1, bottom=0.1)
-    ax.legend(fontsize=14, bbox_to_anchor=(1.01, 1), loc=2, borderaxespad=0.0)
-
-    ax.set_ylabel(r'$log_{10}(\beta) \/\/\mathrm{[m^{-1} \/sr^{-1}]}$', fontsize=16)
-    ax.yaxis.labelpad = 0
-    ax.set_ylim([-6.6, -4.4])
-    ax.axes.get_xaxis().set_ticks([])
-
-    # add all the extra axes which are shown in var_order
-    plot_and_add_x_axes(clearFo_dict, var_order, var_range, variables)
-
-    plt.savefig(savedir + savestr + '_v_beta.png')  # filename
-
-    plt.close(fig)
-
-    return fig
-
-def plot_and_add_x_axes(clearFo_dict, var_order, var_range, variables):
-
-    """
-    Add all the extra axes for beta or alpha plot
-    :return: ax
-    """
-
-    # scaling factors
-    # ['Q', 'p', 'S', 'B', 'r0', 'm0', 'N0', 'm', 'RH']
-
-    scaling = {'N0': 1.0/1.0e6, # cm-3
-               'r0': 1.0e6, # micro meters
-               'm0': 1.0e9} # microgram kg-1
-
-    # add the extra x axis
-    for i, key in zip(np.arange(26 - len(var_order), 26), var_order):
-        ax_i = plt.subplot2grid((27, 1), (i, 0))
-
-        if key in scaling:
-            ax_i.plot(var_range[key] * scaling[key], var_range[key] * scaling[key], label=variables[key][2], color=variables[key][3])
-            ax_i.scatter(clearFo_dict[key] * scaling[key], 0.0, color=variables[key][3], edgecolors='black')
-            ax_i.ticklabel_format(useOffset=False, style='plain')
-            ax_i.set_xlim([var_range[key][0] * scaling[key], var_range[key][-1] * scaling[key]])
-        else:
-            ax_i.plot(var_range[key], var_range[key], label=variables[key][2], color=variables[key][3])
-            ax_i.scatter(clearFo_dict[key], 0, color=variables[key][3], edgecolors='black')
-            ax_i.set_xlim([var_range[key][0], var_range[key][-1]])
-
-        # clean up axis
-        ax_i.spines['top'].set_visible(False)
-        ax_i.spines['right'].set_visible(False)
-        ax_i.spines['left'].set_visible(False)
-        ax_i.yaxis.set_visible(False)
-        # ax_i.set_xlim([np.min(var_range[key]), np.max(var_range[key])])
-
-        ax_i.axes.get_yaxis().set_ticks([])
-        # ax_i.get_xaxis().get_major_formatter().set_scientific(False)
-
-        # colours and remove the line
-        ax_i.tick_params(axis='x', colors=variables[key][3])
-        ax_i.xaxis.label.set_color(variables[key][3])
-        ax_i.spines['bottom'].set_color(variables[key][3])
-        ax_i.lines.pop(0)
-
-    return
 
 
 # -----------------------------------------------------------
@@ -375,7 +233,7 @@ m3_2_cm3 = 1.0e-06
 q_aer_fix = np.array([10])
 
 # create range of murk and RH
-m_range = np.arange(0.0, 60.05, 0.05)
+m_range = np.arange(0.0, 81.0, 1.0)
 RH_range = np.array([20.0, 40.0, 60.0, 80.0, 90.0, 95.0])
 
 # -----------------------------------------------------------
@@ -412,22 +270,32 @@ for RH_i in RH_range:
     RH_i_str = str(RH_i)
     beta_i = beta[RH_i_str]
 
-    plt.plot(m_range, beta_i, label=RH_i_str)
+    if RH_i > 80.0:
+        ls = '--'
+    else:
+        ls = '-'
+
+    plt.plot(m_range, beta_i, label='RH = ' + RH_i_str, linestyle=ls)
 
 
 plt.legend(loc='best', fancybox=True, framealpha=0.5)
 
 # plt.xlabel('aerosol [micrograms kg^-1]')
-plt.xlabel(r'$aerosol \/\mathrm{[\mu g\/ kg^{-1}]}$', labelpad=2)
-plt.ylabel('beta')
-#plt.xlim([0.0, 100.0])
-#plt.ylim([0.0, 0.15])
+plt.xlabel(r'$m_{MURK} \/\mathrm{[\mu g\/ kg^{-1}]}$', labelpad=2)
+plt.ylabel(r'$\beta_{m,\/unatt} \/\mathrm{[m^{-1} sr^{-1}]}$', labelpad=2)
+plt.xlim([0.0, np.max(m_range)])
+plt.ylim([0.0, 1.0e-5])
+ax = plt.gca()
+# ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
+ax.set_yticklabels(["{:.1e}".format(t) for t in ax.get_yticks()])
+
+# u'${10^{-6}}$'
+
+
 plt.grid()
 plt.tight_layout()
 
-fn2 = 'm_and_RH_vs_beta.png'
+fn2 = 'm_and_RH_vs_beta_v0.2.png'
 plt.savefig(savedir + fn2)
-
-
 
 print 'END PROGRAM'

@@ -76,10 +76,12 @@ def bsc_profile_plot(ax, mod_data, bsc_obs, site_bsc_colours, t):
     ax.set_ylabel('Height [m]')
 
     ax.set_ylim([0, 2000])
-    # ax.set_xlim([-7.5, -5.0])
+    # ax.set_xlim([-7.5, -5.0]) # normal
     # ax.xaxis.set_ticks(np.arange(-7.5, -4.5, 0.5))
-    ax.set_xlim([-7.5, -5.0])
-    ax.xaxis.set_ticks(np.arange(-7.5, -4.5, 0.5))
+
+    ax.set_xlim([-7.0, -4.5]) # high PM cases
+    ax.xaxis.set_ticks(np.arange(-7.0, -4.0, 0.5))
+
     # ax.set_prop_cycle(cycler('color', ['b', 'c', 'm', 'y', 'k']))
     eu.add_at(ax, 'a)', loc=2)
 
@@ -154,11 +156,11 @@ def aer_profile_plot(ax, site_aer, pm10_obs, mod_data, site_bsc_colours, t):
 
     # prettify
     ax.set_ylim([0, 2000])
-    ax.set_xlim([0, 100])
+    # ax.set_xlim([0, 100]) # normal
+    ax.set_xlim([0, 150]) # high PM case
+
     ax.set_yticklabels('')
-    # ax.set_xlabel(r'$m$' + ' [' + r'$\mu$' + 'g kg' + r'$-1$' +']')
     ax.set_xlabel(r'$m \/\mathrm{[\mu g\/ kg^{-1}]}$')
-    # ax.set_prop_cycle(cycler('color', ['b', 'c', 'm', 'y', 'k']))
     eu.add_at(ax, 'c)', loc=1)
 
     return ax
@@ -201,7 +203,8 @@ def rh_ts_plot(ax, rh_obs, mod_data, site_bsc_colours, t_hr):
 
     # prettify
     ax.set_ylabel(r'$\mathrm{RH\/\/[\%]}$')
-    ax.set_ylim([20, 80])
+    # ax.set_ylim([20, 80]) # normal
+    ax.set_ylim([20, 100]) # normal
     ax.set_xlim([data_mod['time'][0], data_mod['time'][-1]])
     # ax.set_prop_cycle(cycler('color', ['b', 'c', 'm', 'y', 'k']))
     ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
@@ -230,13 +233,13 @@ def aer_ts_plot(ax, pm10_obs, mod_data, site_bsc_colours, t_hr):
                      color=colour, label=site_mod, linewidth=2, fmt='-', ls='--')
 
     # plot reference line to show where profile lies
-    ax.plot_date([t_hr, t_hr], [0, 100], color='black', ls='--', fmt='-')
+    ax.plot_date([t_hr, t_hr], [0, 1000], color='black', ls='--', fmt='-')
 
     # prettify
     ax.set_ylabel(r'$m \/\mathrm{[\mu g\/ kg^{-1}]}$')
-    ax.set_ylim([0, 100])
+    # ax.set_ylim([0, 100]) # normal
+    ax.set_ylim([20, 160]) # high PM case
     ax.set_xlim([data_mod['time'][0], data_mod['time'][-1]])
-    # ax.set_prop_cycle(cycler('color', ['b', 'c', 'm', 'y', 'k']))
     ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
     ax.set_xlabel('Time [HH:MM]')
     eu.add_at(ax, 'e)', loc=2)
@@ -286,8 +289,12 @@ def main():
     dayStart = dt.datetime(2016, 05, 04)
     dayEnd = dt.datetime(2016, 05, 06)
 
-    daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-                  '20161129', '20161130', '20161204']
+    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+    #               '20161129', '20161130', '20161204']
+
+    # daystrList = ['20160119']
+
+    daystrList =['20161204']
 
     days_iterate = dateList_to_datetime(daystrList)
 
@@ -331,7 +338,7 @@ def main():
         # 5. Read ceilometer backscatter
         # --------------------------------
 
-        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data)
+        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=False)
 
 
         # only keep mod data where ceilometer data also exists

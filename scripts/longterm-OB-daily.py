@@ -264,7 +264,7 @@ def plot_corr(stat, savedir, site_bsc_colours, model_type, corr_max_height):
 
     plt.savefig(savedir +'correlations/' +
                       model_type + '_SpearCorrTs_' + 'clearDaysSample_med_IQR_' +
-                      str(corr_max_height) + 'm.png')  # filename
+                      str(corr_max_height) + 'm_v0.2.png')  # filename
 
 
     return fig
@@ -371,9 +371,12 @@ def main():
     #daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
     #              '20161129', '20161130', '20161204', '20170120', '20170122', '20170325', '20170408']
 
-    # current list
+    # original before went on break
+    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+    #              '20161129']
+
     daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-                  '20161129']
+                  '20161129', '20161130', '20161204']
 
     # daystrList = ['20160504', '20160505']
 
@@ -413,13 +416,13 @@ def main():
 
         # extract MURK aerosol and calculate RH for each of the sites in the ceil metadata
         # reads all london model data, extracts site data, stores in single dictionary
-        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910)
+        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910, version=0.2)
 
         # Read ceilometer backscatter
 
         # will only read in data is the site is there!
         # ToDo Remove the time sampling part and put it into its own function further down.
-        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data)
+        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=False)
 
         # ==============================================================================
         # Process
@@ -492,12 +495,14 @@ def main():
 
     print '\n' + 'Gathering statistics...'
 
-    corr = {}
-    diff = {}
-    rmse = {}
-    sampleSize = {}
+    # corr = {}
+    # diff = {}
+    # rmse = {}
+    # sampleSize = {}
 
     for site_i, site_stats in statistics.iteritems():
+
+        print 'site_i = ' + site_i
 
         # setup site within the summary statistics
         corr = create_stats_summary_dict_med(site_i, corr)

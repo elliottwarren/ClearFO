@@ -45,11 +45,13 @@ def plot_day(bsc_avg_day, bsc_obs, day, savedir, calib):
     ax.set_xlim([0.0, 5.0e-6])
     plt.legend()
     dayStr = day.strftime('%Y%m%d')
-    plt.suptitle(dayStr)
+
 
     if calib == True:
+        plt.suptitle(dayStr + ' : calibrated')
         plt.savefig(savedir + 'avg_Vert_profiles_calib_' + dayStr + '.png')  # filename
     else:
+        plt.suptitle(dayStr + ' : uncalibrated')
         plt.savefig(savedir + 'avg_Vert_profiles_uncalib_' + dayStr + '.png')  # filename
     plt.close(fig)
 
@@ -87,6 +89,9 @@ def main():
     # KSS45W days
     daystrList = ['20150414', '20150415', '20150421', '20150611']
 
+    daystrList = ['20160504', '20160823', '20160911', '20161125',
+                  '20161129', '20161130', '20161204']
+
     bsc_avg_day = {}
 
     calib=True
@@ -115,11 +120,11 @@ def main():
         if day == days_iterate[0]:
 
             bsc_avg_day_all = {}
-            for site in bsc_obs.iterkeys():
+            for site in site_bsc.iterkeys():
                 bsc_avg_day_all[site] = []
 
             bsc_avg_total = {}
-            for site in bsc_obs.iterkeys():
+            for site in site_bsc.iterkeys():
                 bsc_avg_total[site] = []
 
         # average in the vertical
@@ -132,36 +137,36 @@ def main():
 
             # average ceil data in vertical
             bsc_avg_day[site] = np.nanmean(bsc_obs[site]['backscatter'], axis=0)
-            bsc_avg_day_all[site] += [bsc_avg_day[site]]
+            # bsc_avg_day_all[site] += [bsc_avg_day[site]]
 
         # plot avergae profile for the current day
         plot_day(bsc_avg_day, bsc_obs, day, savedir, calib)
 
 
-    # create the average of the average profiles
-    # first turn list of lists into a single numpy array, then average across an axis
-    for site in bsc_obs.iterkeys():
-        bsc_avg_total[site] = np.array([np.array(xi) for xi in bsc_avg_day_all[site]])
-
-        bsc_avg_total[site] = np.nanmean(bsc_avg_total[site], axis=0)
-
-    # plot the average of average profiles
-    fig = plt.figure(figsize=(6, 3.5))
-    ax = plt.subplot2grid((1, 1), (0, 0))
-
-    for site, avg_total in bsc_avg_total.iteritems():
-        ax.plot(avg_total, bsc_obs[site]['height'], label=site)
-
-    ax.set_xlabel('beta')
-    ax.set_ylabel('Height [m]')
-    ax.set_xlim([0.0, 5.0e-6])
-    plt.legend()
-    dayStr = day.strftime('%Y%m%d')
-
-    if calib == True:
-        plt.savefig(savedir + 'avg_ofAvg_Vert_profiles_calib.png')  # filename
-    else:
-        plt.savefig(savedir + 'avg_ofAvg_Vert_profiles_uncalib.png')  # filename
+    # # create the average of the average profiles
+    # # first turn list of lists into a single numpy array, then average across an axis
+    # for site in site_bsc.iterkeys():
+    #     bsc_avg_total[site] = np.array([np.array(xi) for xi in bsc_avg_day_all[site]])
+    #
+    #     bsc_avg_total[site] = np.nanmean(bsc_avg_total[site], axis=0)
+    #
+    # # plot the average of average profiles
+    # fig = plt.figure(figsize=(6, 3.5))
+    # ax = plt.subplot2grid((1, 1), (0, 0))
+    #
+    # for site, avg_total in bsc_avg_total.iteritems():
+    #     ax.plot(avg_total, bsc_obs[site]['height'], label=site)
+    #
+    # ax.set_xlabel('beta')
+    # ax.set_ylabel('Height [m]')
+    # ax.set_xlim([0.0, 5.0e-6])
+    # plt.legend()
+    # dayStr = day.strftime('%Y%m%d')
+    #
+    # if calib == True:
+    #     plt.savefig(savedir + 'avg_ofAvg_Vert_profiles_calib.png')  # filename
+    # else:
+    #     plt.savefig(savedir + 'avg_ofAvg_Vert_profiles_uncalib.png')  # filename
 
     plt.close(fig)
 

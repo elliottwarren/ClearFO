@@ -372,6 +372,9 @@ def main():
         # reads all london model data, extracts site data, stores in single dictionary
         mod_data = FO.mod_site_extract_calc(day, ceil_data_i, modDatadir, model_type, res, 910, version=0.2, allvars=True)
 
+        # mod_data_all = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910, version=0.2, allvars=True)
+
+
         # Read ceilometer backscatter
 
         # will only read in data is the site is there!

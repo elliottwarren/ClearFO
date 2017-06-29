@@ -77,6 +77,9 @@ def read_aer_data(file_path, aer_index, aer_order, band=4):
 
     for aer in aer_order:
 
+
+        print 'Getting ...' + aer
+
         data[aer] = []
 
         file = open(file_path, "r")
@@ -171,6 +174,9 @@ def main():
     #! Manually set
     band = 1
 
+    # saveF(RH)?
+    saveFRH = False
+
     # -------------------------
 
     # directories
@@ -181,7 +187,8 @@ def main():
     # file_name = 'spec3a_sw_hadgem1_7lean_so' # original file given to me by Claire Ryder 25/01/17
     # file_name = 'sp_sw_ga7' # current UM file
     # file_name = 'sp_ew_910' # my own made file with 1 band at 910 nm
-    file_name = 'sp_ew_ceil_guass_903-907'
+    file_name = 'sp_895-915_r1.1e-7_stdev1.6_num8.0e9_salt8.0e-6'
+    # file_name = 'sp_908-912_r1.1e-7_stdev1.6_num8.0e9' # 6 different aerosols inc. salt, biogenic and soot
     file_path = specdir + file_name
 
     # variables to take from file (as listed within the file) with index from BLOCK = 0
@@ -189,10 +196,15 @@ def main():
     if file_name == 'spec3a_sw_hadgem1_7lean_so':
         aer_index = {'Accum. Sulphate': 6, 'Aitken Sulphate': 7, 'Aged fossil-fuel OC': 22}
         aer_order = ['Accum. Sulphate', 'Aitken Sulphate', 'Aged fossil-fuel OC']
-    else:
+    elif file_name == 'sp_ew_ceil_guass_903-907':
         aer_index = {'Accum. Sulphate': 1, 'Aged fossil-fuel OC': 2, 'Ammonium nitrate': 3}
         aer_order = ['Accum. Sulphate', 'Aged fossil-fuel OC', 'Ammonium nitrate']
-
+    elif file_name == 'sp_895-915_r1.1e-7_stdev1.6_num8.0e9_salt8.0e-6':
+        aer_index = {'Ammonium Sulphate': 1, 'Generic NaCl': 2, 'Biogenic': 3, 'Aged fossil-fuel OC': 4, 'Ammonium nitrate': 5}
+        aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Biogenic', 'Aged fossil-fuel OC', 'Ammonium nitrate']
+    else:
+        aer_index = {'Ammonium Sulphate': 2, 'Generic NaCl': 3, 'Biogenic': 4, 'Aged fossil-fuel OC': 5, 'Ammonium nitrate': 6}
+        aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Biogenic', 'Aged fossil-fuel OC', 'Ammonium nitrate']
         # aer_index = {'Accum. Sulphate': 14, 'Aitken Sulphate': 15, 'Aged fossil-fuel OC': 24, 'Ammonium nitrate': 26}
         # aer_order = ['Accum. Sulphate', 'Aitken Sulphate', 'Aged fossil-fuel OC', 'Ammonium nitrate']
 
@@ -222,13 +234,31 @@ def main():
     # calculate f(RH)
     Q, f_RH = calc_f_RH(data, aer_order, Q_type=Q_type)
 
+    # add a soot f_RH
+    f_RH['Soot'] = [1.0 for i in f_RH['Generic NaCl']]
+
     # create an average f(RH)
     # f_RH['average with Aitken Sulphate'] = np.mean(f_RH.values(), axis=0)
-    f_RH['average'] = np.mean((f_RH['Accum. Sulphate'], f_RH['Aged fossil-fuel OC'], f_RH['Ammonium nitrate']), axis=0)
+    # f_RH['average'] = np.mean((f_RH['Ammonium Sulphate'], f_RH['Aged fossil-fuel OC'], f_RH['Ammonium nitrate']), axis=0)
+    f_RH['MURK'] = (np.array(f_RH['Ammonium Sulphate']) * 0.295) + (0.38 * np.array(f_RH['Aged fossil-fuel OC'])) + \
+    (0.325 * np.array(f_RH['Ammonium nitrate']))
 
     # save f(RH)
-    # np.savetxt(datadir +  'calculated_ext_f(RH)_'+str(ceil_lam)+'nm.csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
-    np.savetxt(f_RHdir +  file_name + '_ext_f(RH)_' + band_lam_range + '.csv', np.transpose(np.vstack((RH, f_RH['average']))), delimiter=',', header='RH,f_RH')
+    if saveFRH == True:
+        np.savetxt(f_RHdir +  file_name + '_ext_f(RH)_' + band_lam_range + '.csv',
+                   np.transpose(np.vstack((RH, f_RH['MURK']))), delimiter=',', header='RH,f_RH')
+
+    # min and max possible ranges in f(RH)
+    # https://books.google.co.uk/books?id=OnmyzXfS6ggC&pg=PA59&lpg=PA59&dq=mass+closure+aerosol+london&source=bl&ots=Nd9L-GBPp_&sig=0KzD_
+    # USvtga8-c4fv674hPKnA1E&hl=en&sa=X&ved=0ahUKEwiDwqPeqLHUAhXIKcAKHSmsBW8Q6AEIVzAH#v=onepage&q=mass%20closure%20aerosol%20london&f=false
+    # U is capitalised...
+
+    # Need something to represent Iron-rich Dusts (mineral matter?)
+    #f_RH_Birmingham = (0.093 * np.array(f_RH['Generic NaCl'])) + (0.08 * np.array(f_RH['Soot'])) + \
+    #(0.2757 * np.array(f_RH['Ammonium Sulphate'])) + (0.2757 * np.array(f_RH['Ammonium nitrate'])) + (0.2757 * np.array(f_RH['Aged fossil-fuel OC']))
+
+    # How much bigger is Birmingham to MURK?
+    # f_RH['Birmingham'] / np.array(f_RH['MURK'])
 
     # ---------------------------------------------------
     # Plotting
@@ -236,25 +266,30 @@ def main():
 
     # plot the data at the end so it is all neat and together
     fig = plt.figure(figsize=(6, 4))
+
     for key, value in data.iteritems():
 
-        plt.plot(value[:, 0], f_RH[key], label=key, linestyle='--')
+        plt.plot(RH*100, f_RH[key], label=key, linestyle='--')
 
     # plt.plot(value[:, 0], f_RH['average with Aitken Sulphate'], label='average with Aitken Sulphate', linestyle='-')
 
-    # plot the average one (use RH from the last data.iteritems()
+    # plot the MURK one
     # plt.plot(value[:, 0], f_RH['average'], label='average without Aitken Sulphate', color='black')
-    plt.plot(value[:, 0], f_RH['average'], label='average', color='black')
+    plt.plot(RH*100, f_RH['MURK'], label='MURK', color='black')
+
+    # plot soot as a constant until I get f(RH) for it
+    plt.plot([0.0, 100.0], [1.0, 1.0], label='Soot')
 
 
     plt.legend(fontsize=9, loc='best')
-    plt.xlabel('RH', labelpad=0)
-    plt.ylabel(Q_type + ' f(RH)')
+    plt.xlabel('RH [%]', labelpad=0)
+    # plt.ylabel(Q_type + ' f(RH)')
+    plt.ylabel(r'$f_{ext}$')
     plt.ylim([0.0, 8.0])
-    plt.xlim([0.0, 1.0])
+    plt.xlim([0.0, 100.0])
     plt.title(file_name + ': ' + band_lam_range + ' band')
     plt.tight_layout() # moved tight_layout above... was originally after the save (06/04/17)
-    plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_' + band_lam_range + '.png')
+    plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_all_' + band_lam_range + '_salt8.0.png')
 
 
 

@@ -15,6 +15,48 @@ import ellUtils as eu
 from forward_operator import FOUtils as FO
 from forward_operator import FOconstants as FOcon
 
+def plot_r_md(mod_data, savedir):
+
+    """
+    Plot r_m frequency distribution as a line graph
+    EW 22/02/17
+    :param mod_data:
+    :param savedir:
+    :return:
+    """
+
+    fig = plt.figure(figsize=(8, 4.5))
+
+    for site, site_data in mod_data.iteritems():
+
+        r_md = site_data['r_md'] * 1.0e6 # micrometers
+        # N = site_data['N'] * 1e-06  # micrometers
+
+        # reference for dN/dlog(D) graphs (bottom of page 3)
+        # http://www.tsi.com/uploadedFiles/_Site_Root/Products/Literature/Application_Notes
+        # /PR-001-RevA_Aerosol-Statistics-AppNote.pdf
+
+        # line style
+        y, binEdges = np.histogram(r_md, bins=100)
+        bincenters = 0.5 * (binEdges[1:] + binEdges[:-1])
+        plt.semilogx(bincenters, y, '-', label=site)
+
+        plt.xlabel(r'$radius \/\mathrm{[\mu m]}}$')
+        # plt.xlabel(r'$number conc.\/\mathrm{[cm^{-1}]}}$')
+        plt.ylabel('frequency')
+        plt.grid()
+        plt.legend(loc='best', fancybox=True, framealpha=0.5)
+        plt.tight_layout()
+
+        if site == 'IMU':
+            stdev = np.std(np.log10(r_md))
+            print 'standard deviation of r_md = ' + str(stdev)
+
+    plt.savefig(savedir + 'r_md_dist' + '.png')
+    plt.close(fig)
+
+    return
+
 def plot_r_m(mod_data, savedir):
 
     """
@@ -39,7 +81,7 @@ def plot_r_m(mod_data, savedir):
         # line style
         y, binEdges = np.histogram(r_m, bins=100)
         bincenters = 0.5 * (binEdges[1:] + binEdges[:-1])
-        plt.plot(bincenters, y, '-', label=site)
+        plt.semilogx(bincenters, y, '-', label=site)
 
         plt.xlabel(r'$radius \/\mathrm{[\mu m]}}$')
         # plt.xlabel(r'$number conc.\/\mathrm{[cm^{-1}]}}$')
@@ -47,6 +89,10 @@ def plot_r_m(mod_data, savedir):
         plt.grid()
         plt.legend(loc='best', fancybox=True, framealpha=0.5)
         plt.tight_layout()
+
+        if site == 'IMU':
+            stdev = np.std(np.log10(r_m))
+            print 'standard deviation of r_m = ' + str(stdev)
 
     plt.savefig(savedir + 'r_m_dist' + '.png')
     plt.close(fig)
@@ -297,6 +343,7 @@ def main():
     # ==============================================================================
 
     # plotting
+    plot_r_md(mod_data, savedir)
     plot_r_m(mod_data, savedir)
     plot_N(mod_data, savedir)
     plot_Q_line(mod_data, savedir)

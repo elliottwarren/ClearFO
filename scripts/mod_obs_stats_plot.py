@@ -16,6 +16,18 @@ import ellUtils as eu
 from forward_operator import FOUtils as FO
 from forward_operator import FOconstants as FOcon
 
+def dateList_to_datetime(dayList):
+
+    """ Convert list of string dates into datetimes """
+
+    datetimeDays = []
+
+    for d in dayList:
+
+        datetimeDays += [dt.datetime(int(d[0:4]), int(d[4:6]), int(d[6:8]))]
+
+    return datetimeDays
+
 def stats_dic(site_bsc, mbe_limit_max, mbe_limit_step):
 
     """
@@ -115,13 +127,13 @@ def plot_correlations(savedir, model_type, statistics, corr_max_height):
         plt.plot_date(data['time'], data['r'], label=site, linewidth=1, fmt='-')
 
     # plot reference line to show where profile lies
-    ax.plot_date([statistics['RGS']['time'][24], statistics['RGS']['time'][24]], [-1, 1], color='black', ls='--', fmt='--')
-    ax.plot_date([statistics['RGS']['time'][49], statistics['RGS']['time'][49]], [-1, 1], color='black', ls='--', fmt='--')
+    #ax.plot_date([statistics['RGS']['time'][24], statistics['RGS']['time'][24]], [-1, 1], color='black', ls='--', fmt='--')
+    #ax.plot_date([statistics['RGS']['time'][49], statistics['RGS']['time'][49]], [-1, 1], color='black', ls='--', fmt='--')
 
     # prettify
     # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
     ax.set_xlim([data['time'][0], data['time'][-1]])
-    ax.set_ylim([-0.5, 1])
+    ax.set_ylim([0.2, 1])
     ax.set_xlabel('Time [DD/ HH:MM]')
     ax.set_ylabel(r'$Spearman \/\/\rho \/\/correlation$')
     ax.xaxis.set_major_formatter(DateFormatter('%d/ %H:%M'))
@@ -162,8 +174,8 @@ def plot_mbe(savedir, model_type, statistics, height_groups_order, site_bsc_colo
         # prettify - plot specific and done once the data is plotted
         p.set_xlim([data['time'][0], data['time'][-1]])
         eu.add_at(p, hg + ' m', loc=4)
-        p.set_ylim([-1.8, 1.8])
-        p.yaxis.set_ticks(np.arange(1.5, -2.5, -1))
+        #p.set_ylim([-1.8, 1.8])
+        #p.yaxis.set_ticks(np.arange(1.5, -2.5, -1))
 
     # reference lines
     for p in np.arange(len(ax)):
@@ -214,7 +226,7 @@ def main():
     # directories
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
     datadir = maindir + 'data/'
-    savedir = maindir + 'figures/' + model_type + '/'
+    savedir = maindir + 'figures/' + model_type + '/highPmCase/'
 
     # data
     ceilDatadir = datadir + 'L1/'
@@ -229,12 +241,16 @@ def main():
     site_bsc_colours = FOcon.site_bsc_colours
 
     # day start and end of the MAIN DAYS, inclusively(forecast day + 1)
-    dayStart = dt.datetime(2016, 05, 04)
-    dayEnd = dt.datetime(2016, 05, 06)
+    # dayStart = dt.datetime(2016, 05, 04)
+    # dayEnd = dt.datetime(2016, 05, 06)
+
+    daystrList = ['20160119']
+
+    days_iterate = dateList_to_datetime(daystrList)
 
     # statistics to run
-    stats_corr = True
-    stats_mbe = False
+    stats_corr = False
+    stats_mbe = True
 
     # mbe ranges
     mbe_limit_step = 500
@@ -256,10 +272,10 @@ def main():
 
     # 1. Read Ceilometer metadata
     # ----------------------------
-    ceil_metadata = FO.read_ceil_metadata(datadir)
+    ceil_metadata = FO.read_ceil_metadata(datadir, loc_filename='CeilsCSVclearFO.csv')
 
-    # datetime range to iterate over
-    days_iterate = eu.date_range(dayStart, dayEnd, 1, 'days')
+    # # datetime range to iterate over
+    # days_iterate = eu.date_range(dayStart, dayEnd, 1, 'days')
 
     for day in days_iterate:
 
