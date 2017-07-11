@@ -422,7 +422,15 @@ def main():
 
         # will only read in data is the site is there!
         # ToDo Remove the time sampling part and put it into its own function further down.
-        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=False)
+        # bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=False)
+        bsc_obs = FO.read_all_ceil_BSC(day, site_bsc, ceilDatadir, timeMatch=mod_data, calib=True)
+
+        # mlh_obs = FO.read_all_ceil_obs(day, site_bsc, ceilDatadir, fType= 'MLH', timeMatch=mod_data, calib=True)
+        mlh_obs = FO.read_all_ceil_obs(day, site_bsc, ceilDatadir, fType='MLH', calib=True)
+
+        # BLH (Kotthaus and Grimmond, 2017)
+        # datapath = datadir + 'L1/CL31-C_MLH_MR_2016019_15min.nc'
+        # BLH = eu.netCDF_read(datapath, vars='')
 
         # ==============================================================================
         # Process
