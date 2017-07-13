@@ -16,9 +16,53 @@ from scipy.stats import spearmanr
 from copy import deepcopy
 
 import ellUtils as eu
-from mod_obs_stats_plot import unique_pairs
 from forward_operator import FOUtils as FO
 from forward_operator import FOconstants as FOcon
+
+
+def unique_pairs(obs_idx, diff):
+
+    """
+    Find range that excludes duplicate occurances. Keeps the pair with the smallest height difference and removes
+    the rest.
+
+    :param obs_idx:
+    :param diff:
+    :return: unique_pairs_range
+
+    At this point, the two arrays are like:
+    obs_idx = [0, 0, 0, 1, 3, 5, .... 769, 769, 769]
+    mod_idx = [0, 1, 2, 3, 4, 4, .... 67,  68,  69 ]
+    By finding the unique pairs index array for obs_idx, the same array can be used
+    on the mod_idx, as they are already paired up and of equal lengths. E.g. from above
+    0-0, 0-1, ..., 3-4, 5-4 etc.
+    """
+
+    # 1. remove start duplicates
+    # -------------------------------
+    # find start idx to remove duplicate pairs
+    duplicates = np.where(obs_idx == obs_idx[0])[0]  # find duplicates
+
+    if len(duplicates) > 1:
+        lowest_diff = np.argmin(abs(diff[duplicates]))  # find which has smallest difference
+        pairs_idx_start = duplicates[lowest_diff]  # set start position for pairing at this point
+    else:
+        pairs_idx_start = 0
+
+    # 2. remove end duplicates
+    # -------------------------------
+    # find end idx to remove duplicate pairs
+    duplicates = np.where(obs_idx == obs_idx[-1])[0]  # find duplicates
+    if len(duplicates) > 1:
+        lowest_diff = np.argmin(abs(diff[duplicates]))  # find which has smallest difference
+        pairs_idx_end = duplicates[lowest_diff]  # set start position for pairing at this point
+    else:
+        pairs_idx_end = len(obs_idx)
+
+    # create range in order to extract the unique pairs
+    unique_pairs_range = np.arange(pairs_idx_start, pairs_idx_end + 1)
+
+    return unique_pairs_range
 
 def create_stats_entry(site_id, statistics={}):
 
@@ -131,14 +175,13 @@ def dateList_to_datetime(dayList):
 
     return datetimeDays
 
-def nearest_heights(mod_height, obs_height, corr_max_height):
+def nearest_heights(mod_height, obs_height):
 
     """
     Get the nearest ceilometer height gate to each model level
 
     :param mod_height:
     :param obs_height:
-    :param corr_max_height:
     :return:
 
     obs_idx = ALL nearest gate idx
@@ -169,19 +212,29 @@ def nearest_heights(mod_height, obs_height, corr_max_height):
 
     # ~~~~~~~~~~~~~~~~~~~~ #
 
+    # repeat columns of heights for each time interval, as we need to cut different heights off for each time, based on
+    # the MLH.
+    # obs_unique_pairs_full    = np.array([obs_unique_pairs]    * len(mlh_obs[site]['time']))
+    # mod_unique_pairs_full    = np.array([mod_unique_pairs]    * len(mlh_obs[site]['time']))
+    # values_unique_pairs_full = np.array([values_unique_pairs] * len(mlh_obs[site]['time']))
+    # diff_unique_pairs_full   = np.array([diff_unique_pairs]   * len(mlh_obs[site]['time']))
+
     # Remove pairs where obs is above the max allowed height.
-    # hc = height cut
-    hc_unique_pairs_range = np.where(values_unique_pairs <= corr_max_height)[0]
 
-    # trim off unique pairs that are above the maximum height
-    obs_hc_unique_pairs = obs_unique_pairs[hc_unique_pairs_range]
-    mod_hc_unique_pairs = mod_unique_pairs[hc_unique_pairs_range]
-    pairs_hc_unique_values = values_unique_pairs[hc_unique_pairs_range]
-    pairs_hc_unique_diff = diff_unique_pairs[hc_unique_pairs_range]
+    # obs_unique_pairs_mlh =
+
+    # hc = height cut - original using corr_max_height
+    # hc_unique_pairs_range = np.where(values_unique_pairs <= corr_max_height)[0]
+    #
+    # # trim off unique pairs that are above the maximum height
+    # obs_hc_unique_pairs = obs_unique_pairs[hc_unique_pairs_range]
+    # mod_hc_unique_pairs = mod_unique_pairs[hc_unique_pairs_range]
+    # pairs_hc_unique_values = values_unique_pairs[hc_unique_pairs_range]
+    # pairs_hc_unique_diff = diff_unique_pairs[hc_unique_pairs_range]
 
 
-    return obs_hc_unique_pairs, mod_hc_unique_pairs, \
-           pairs_hc_unique_values, pairs_hc_unique_diff
+    return obs_unique_pairs, mod_unique_pairs, \
+           values_unique_pairs, diff_unique_pairs
 
 def summary_statistics_mean(stat_i, site_i, hr, stat_data_hr):
 
@@ -232,7 +285,7 @@ def summary_statistics_med(stat_i, site_i, site_stats_i):
 
     return stat_i
 
-def plot_corr(stat, savedir, site_bsc_colours, model_type, corr_max_height):
+def plot_corr(stat, savedir, site_bsc_colours, model_type, extra=''):
 
     """
     Plot the median and IQR of the correlation
@@ -264,12 +317,12 @@ def plot_corr(stat, savedir, site_bsc_colours, model_type, corr_max_height):
 
     plt.savefig(savedir +'correlations/' +
                       model_type + '_SpearCorrTs_' + 'clearDaysSample_med_IQR_' +
-                      str(corr_max_height) + 'm_v0.2.png')  # filename
+                      extra + '.png')  # filename
 
 
     return fig
 
-def plot_rmse(stat, savedir, site_bsc_colours, model_type):
+def plot_rmse(stat, savedir, site_bsc_colours, model_type, extra=''):
 
         """
         Plot the median and IQR of the rmse
@@ -298,11 +351,11 @@ def plot_rmse(stat, savedir, site_bsc_colours, model_type):
         fig.suptitle('median and IQR')
         plt.tight_layout()
         plt.savefig(savedir + 'rmse/' +
-                    model_type + '_rmse_' + 'clearDaysSample_med_IQR.png')  # filename
+                    model_type + '_rmse_' + 'clearDaysSample_med_IQR' + extra + '.png')  # filename
 
         return fig
 
-def plot_diff(stat, savedir, site_bsc_colours, model_type):
+def plot_diff(stat, savedir, site_bsc_colours, model_type, extra=''):
     """
     Plot the median and IQR of the diff
     :return:
@@ -331,7 +384,7 @@ def plot_diff(stat, savedir, site_bsc_colours, model_type):
     # fig.suptitle('median and IQR')
     plt.tight_layout()
     plt.savefig(savedir + 'diff/' +
-                model_type + '_difference_normal_' + 'clearDaysSample_med_IQR.png')  # filename
+                model_type + '_difference_normal_' + 'clearDaysSample_med_IQR' + extra + '.png')  # filename
 
     return fig
 
@@ -375,8 +428,11 @@ def main():
     # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
     #              '20161129']
 
+    # true list
     daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
                   '20161129', '20161130', '20161204']
+
+    # daystrList = ['20150415'] # KSS45W has MLH, MR and NK have MH.
 
     # daystrList = ['20160504', '20160505']
 
@@ -384,8 +440,8 @@ def main():
 
     # statistics to run
     stats_corr = True
-    stats_diff = True
-    stats_RMSE = True
+    stats_diff = False # Currently calib is turned off!
+    stats_RMSE = False # Currently calib is turned off!
 
     # correlation max height
     corr_max_height = 2000
@@ -423,10 +479,10 @@ def main():
         # will only read in data is the site is there!
         # ToDo Remove the time sampling part and put it into its own function further down.
         # bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=False)
-        bsc_obs = FO.read_all_ceil_BSC(day, site_bsc, ceilDatadir, timeMatch=mod_data, calib=True)
+        bsc_obs = FO.read_all_ceil_BSC(day, site_bsc, ceilDatadir, timeMatch=mod_data, calib=False)
 
         # mlh_obs = FO.read_all_ceil_obs(day, site_bsc, ceilDatadir, fType= 'MLH', timeMatch=mod_data, calib=True)
-        mlh_obs = FO.read_all_ceil_obs(day, site_bsc, ceilDatadir, fType='MLH', calib=True)
+        mlh_obs = FO.read_all_ceil_obs(day, site_bsc, ceilDatadir, timeMatch=mod_data, fType='MLH')
 
         # BLH (Kotthaus and Grimmond, 2017)
         # datapath = datadir + 'L1/CL31-C_MLH_MR_2016019_15min.nc'
@@ -439,63 +495,77 @@ def main():
         # requires model data to be at ceilometer location!
         for site, bsc_site_obs in bsc_obs.iteritems():
 
-            # short site id that matches the model id
-            site_id = site.split('_')[-1]
-            print '     Processing for site: ' + site_id
+            # also requires MLH data
+            if site in mlh_obs:
 
-            # Get unique height pairs between obs and model
-            # each height is only paired up once
-            # heights above a maximum limit are cut (define by corr_max_height)
+                # short site id that matches the model id
+                site_id = site.split('_')[-1]
+                print '     Processing for site: ' + site_id
 
-            obs_hc_unique_pairs, mod_hc_unique_pairs, \
-            pairs_hc_unique_values, pairs_hc_unique_diff = \
-                nearest_heights(mod_data[site_id]['level_height'], bsc_site_obs['height'], corr_max_height)
+                # Get unique height pairs between obs and model
+                # each height is only paired up once
+                # no cutting of maximium height limit yet... that is done in the t loop
 
-            # create entry in the dictionary if one does not exist
-            statistics = create_stats_entry(site_id, statistics)
-            #stat_mean  = create_stats_entry(site_id, stat_mean)
-            #stat_stdev = create_stats_entry(site_id, stat_stdev)
-            #stat_n = create_stats_entry(site_id, stat_n)
+                obs_unique_pairs, mod_unique_pairs, \
+                values_unique_pairs, diff_unique_pairs = \
+                    nearest_heights(mod_data[site_id]['level_height'], bsc_site_obs['height'])
 
-            # for each hour possible in the day
-            for t in np.arange(0, 24):
+                # create entry in the dictionary if one does not exist
+                statistics = create_stats_entry(site_id, statistics)
 
-                hr = str(t)
+                # KSS45W has MLH whereas MR and NK have MH.
+                # Currently they're different so put a work around in for now.
+                if 'MLH' in mlh_obs[site]:
+                    mlh = mlh_obs[site]['MLH']
+                elif 'MH' in mlh_obs[site]:
+                    mlh = mlh_obs[site]['MH']
 
-                # extract out all unique pairs below the upper height limit
-                # these are time and height matched now
-                obs_x = bsc_site_obs['backscatter'][t, obs_hc_unique_pairs]
-                mod_y = mod_data[site_id]['backscatter'][t, mod_hc_unique_pairs]
+                # for each hour possible in the day
+                for t, MLH_i in zip(np.arange(0, 24), mlh):
 
-                # STATISTICS
-                # ---------------
+                    hr = str(t)
 
-                # store time
-                # statistics[site_id]['time'] += [mod_data[site_id]['time'][t]]
+                    # pairs below the MLH height at this time
+                    mlh_unique_pairs_range = np.where(values_unique_pairs <= MLH_i)[0]
 
-                # Correlations
-                if stats_corr == True:
+                    # get unique pairs under the MLH for this timestep
+                    obs_mlh_unique_pairs = obs_unique_pairs[mlh_unique_pairs_range]
+                    mod_mlh_unique_pairs = mod_unique_pairs[mlh_unique_pairs_range]
 
-                    # correlate and store
-                    # if number of remaining pairs is too low, set r and p to nan
-                    try:
-                        r, p = spearmanr(np.log10(obs_x), np.log10(mod_y), nan_policy='omit')
-                    except:
-                        r = np.nan
-                        p = np.nan
+                    # extract out all unique pairs below the upper height limit
+                    # these are time and height matched now
+                    obs_x = bsc_site_obs['backscatter'][t, obs_mlh_unique_pairs]
+                    mod_y = mod_data[site_id]['backscatter'][t, mod_mlh_unique_pairs]
 
-                    statistics[site_id]['r'][hr] += [r]
-                    statistics[site_id]['p'][hr] += [p]
+                    # STATISTICS
+                    # ---------------
 
-                if stats_diff == True:
+                    # store time
+                    # statistics[site_id]['time'] += [mod_data[site_id]['time'][t]]
 
-                    # statistics[site_id]['diff'][hr] += [np.nanmedian(np.log10(mod_y) - np.log10(obs_x))]
-                    statistics[site_id]['diff'][hr] += [np.nanmedian(obs_x / mod_y)]
-                    # statistics[site_id]['diff'][hr] += [np.nanmean(np.log10(mod_y) - np.log10(obs_x))]
+                    # Correlations
+                    if stats_corr == True:
 
-                if stats_RMSE == True:
+                        # correlate and store
+                        # if number of remaining pairs is too low, set r and p to nan
+                        try:
+                            r, p = spearmanr(obs_x, mod_y, nan_policy='omit')
+                        except:
+                            r = np.nan
+                            p = np.nan
 
-                    statistics[site_id]['RMSE'][hr] += [eu.rmse(np.log10(mod_y), np.log10(obs_x))]
+                        statistics[site_id]['r'][hr] += [r]
+                        statistics[site_id]['p'][hr] += [p]
+
+                    if stats_diff == True:
+
+                        # statistics[site_id]['diff'][hr] += [np.nanmedian(np.log10(mod_y) - np.log10(obs_x))]
+                        statistics[site_id]['diff'][hr] += [np.nanmedian(obs_x / mod_y)]
+                        # statistics[site_id]['diff'][hr] += [np.nanmean(np.log10(mod_y) - np.log10(obs_x))]
+
+                    if stats_RMSE == True:
+
+                        statistics[site_id]['RMSE'][hr] += [eu.rmse(np.log10(mod_y), np.log10(obs_x))]
 
 
     # gather up statistics...
@@ -514,13 +584,13 @@ def main():
 
         # setup site within the summary statistics
         corr = create_stats_summary_dict_med(site_i, corr)
-        rmse = create_stats_summary_dict_med(site_i, rmse)
-        diff = create_stats_summary_dict_med(site_i, diff)
+        # rmse = create_stats_summary_dict_med(site_i, rmse)
+        # diff = create_stats_summary_dict_med(site_i, diff)
 
         # carry out statistics
         corr = summary_statistics_med(corr, site_i, site_stats['r'])
-        diff = summary_statistics_med(diff, site_i, site_stats['diff'])
-        rmse = summary_statistics_med(rmse, site_i, site_stats['RMSE'])
+        # diff = summary_statistics_med(diff, site_i, site_stats['diff'])
+        # rmse = summary_statistics_med(rmse, site_i, site_stats['RMSE'])
 
 
     # plot!
@@ -531,9 +601,11 @@ def main():
     #:return: fig
     #"""
 
-    fig = plot_corr(corr, savedir, site_bsc_colours, model_type, corr_max_height)
-    fig = plot_rmse(rmse, savedir, site_bsc_colours, model_type)
-    fig = plot_diff(diff, savedir, site_bsc_colours, model_type)
+    extra='MLH'
+
+    fig = plot_corr(corr, savedir, site_bsc_colours, model_type, extra=extra)
+    # fig = plot_rmse(rmse, savedir, site_bsc_colours, model_type, extra=extra)
+    # fig = plot_diff(diff, savedir, site_bsc_colours, model_type, extra=extra)
 
 
     plt.close('all')
