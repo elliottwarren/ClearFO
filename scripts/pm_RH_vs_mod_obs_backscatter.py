@@ -118,7 +118,7 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
 
     # backscatter point difference
     back_point_diff = stats_site['back_diff_norm']
-
+    # back_point_diff = stats_site['back_diff_log']
 
     fig = plt.figure(figsize=(6, 3.5))
     ax = plt.subplot2grid((1, 1), (0, 0))
@@ -141,7 +141,7 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
     ax.axhline(linestyle='--', color='grey', alpha=0.5)
     ax.axvline(linestyle='--', color='grey', alpha=0.5)
 
-    ax.set_ylim([-5e-06, 5e-06])
+    # ax.set_ylim([-5e-06, 5e-06])
 
     # add colourbar on the side
     divider = make_axes_locatable(ax)
@@ -150,6 +150,7 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
 
 
     ax.set_xlabel(xlab)
+    ax.set_ylim([-1e-5, 1e-5])
     # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
     ax.set_ylabel(r'$Difference \/\mathrm{(\beta_m - \beta_o)}$')
 
@@ -166,7 +167,7 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
     plt.subplots_adjust(top=0.90)
     plt.savefig(savedir + 'point_diff/' +
                 model_type + '_' + var_type + '_diff_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '_c' + c_type +
-                '_' + extra + '_norm.png')  # filename
+                '_' + extra + '.png')  # filename
 
     plt.close(fig)
 
@@ -274,8 +275,8 @@ def main():
     aerDatadir = datadir + 'LAQN/'
 
     # statistics to run
-    pm10_stats = True
-    rh_stats = False
+    pm10_stats = False
+    rh_stats = True
 
     # # instruments and other settings
     #site_rh = FOcon.site_rh
@@ -291,11 +292,17 @@ def main():
     #site_rh = {'Davis_IMU': 72.8}
     #rh_instrument = site_rh.keys()[0]
 
-
-    site = 'NK'
-    ceil_id = 'CL31-D'
+    # pm10
+    site = 'MR'
+    ceil_id = 'CL31-C'
     # ceil = ceil_id + '_BSC_' + site
     ceil = ceil_id + '_' + site
+
+    ## rh
+    #site = 'KSS45W'
+    #ceil_id = 'CL31-A'
+    ## ceil = ceil_id + '_BSC_' + site
+    #ceil = ceil_id + '_' + site
 
     site_bsc = {ceil: FOcon.site_bsc[ceil]}
     # site_bsc = {ceil: FOcon.site_bsc[ceil], 'CL31-E_BSC_NK': 27.0 - 23.2}
@@ -487,42 +494,30 @@ def main():
 
 
 
-    # quick remove RH > 80
-    idx_gt = np.where(np.array(statistics[site_id]['rh_mod']) >= 80.0)
-
-    for key in statistics[site_id].iterkeys():
-        if len(statistics[site_id][key]) != 0:
-            for i in idx_gt[0]:
-                statistics[site_id][key][i] = np.nan
-    sampleSize -= len(idx_gt[0])
-    # gather up statistics...
-
-    # idx = np.where((np.array(statistics[site_id]['aer_diff']) > 65.0) & (np.array(statistics[site_id]['back_point_diff']) < 2.0e-06))
-    # idx2 = np.where((np.array(statistics[site_id]['aer_diff']) > 90.0) & (np.array(statistics[site_id]['back_point_diff']) > 2.0e-06))
+    # # quick remove RH > 80
+    # val = 80.0
+    # idx_lt = np.where(np.array(statistics[site_id]['rh_mod']) <= val)
     #
     # for key in statistics[site_id].iterkeys():
     #     if len(statistics[site_id][key]) != 0:
-    #         for i in idx[0]:
+    #         for i in idx_lt[0]:
     #             statistics[site_id][key][i] = np.nan
-    # sampleSize -= len(idx_gt[0])
-    #
-    # for key in statistics[site_id].iterkeys():
-    #     if len(statistics[site_id][key]) != 0:
-    #         for i in idx2[0]:
-    #             statistics[site_id][key][i] = np.nan
-    # sampleSize -= len(idx_gt[0])
+    # sampleSize -= len(idx_lt[0])
+
 
     # do correlation
     if rh_stats == True:
         corr = {}
         corr['r'], corr['p'] = spearmanr(statistics[site_id]['rh_diff'], statistics[site_id]['back_diff_norm'], nan_policy='omit')
+        a1 = np.array(statistics[site_id]['aer_mod']) # extract the rh difference dataset from statistics
 
     if pm10_stats == True:
         corr = {}
         corr['r'], corr['p'] = spearmanr(statistics[site_id]['aer_diff'], statistics[site_id]['back_diff_norm'], nan_policy='omit')
-
+        a1 = np.array(statistics[site_id]['aer_diff']) # extract the aerosol difference dataset from statistics
     # plot!
-    a1 = np.array(statistics[site_id]['aer_diff'])
+
+
     b1 = np.array(statistics[site_id]['back_diff_norm'])
 
     a1_idx = np.where(np.isnan(a1))
@@ -539,12 +534,12 @@ def main():
     if pm10_stats == True:
         plot_back_point_diff(statistics[site_id],
                                    savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type='aerosol',
-                                   c_type='rh_mod', extra = '_lt80')
+                                   c_type='rh_mod', extra = '_lt' + str(int(val)) + '_log')
 
     if rh_stats == True:
         plot_back_point_diff(statistics[site_id],
                                    savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type='RH',
-                                   c_type='rh_mod')
+                                   c_type='aer_mod')
 
 
     plt.close('all')
@@ -559,46 +554,45 @@ def main():
 
 
 
-    # a(i) + b(i)*orog – orog which is the height above the surface
-    # plot heights a(i) and height(i)
-    orog = {'NK':28.6743, 'KSS45W': 21.969, 'RGS': 19.9921, 'MR': 43.1841, 'IMU': 29.6641}
-
-    a = np.array([5.00000,21.6667,45.0000,75.0000,111.667,155.000,205.000,261.667
-        ,325.000,395.000,471.667,555.000,645.000,741.667,845.000,955.000
-        ,1071.67,1195.00,1325.00,1461.67,1605.00,1755.00,1911.67,2075.00
-        ,2245.00,2421.67,2605.00,2795.00,2991.67,3195.00,3405.00,3621.67
-        ,3845.00,4075.00,4311.67,4555.00,4805.00,5061.67,5325.00,5595.00
-        ,5871.67,6155.01,6445.15,6742.49,7047.82,7362.36,7687.92,8026.93
-        ,8382.58,8758.92,9160.94,9594.76,10067.7,10588.3,11166.8,11814.9
-        ,12546.0,13375.7,14321.3,15402.7,16642.0,18063.9,19696.0,21568.9
-        ,23716.1,26174.7,28985.5,32192.7,35845.0,40000.0])
-
-    b = np.array([0.999424,0.997504,0.994820,0.991375,0.987171,0.982215,0.976512,0.970069
-        ,0.962893,0.954993,0.946377,0.937057,0.927043,0.916346,0.904981,0.892961
-        ,0.880300,0.867014,0.853118,0.838632,0.823572,0.807957,0.791808,0.775146
-        ,0.757992,0.740368,0.722298,0.703807,0.684920,0.665662,0.646062,0.626146
-        ,0.605944,0.585484,0.564799,0.543919,0.522876,0.501704,0.480437,0.459110
-        ,0.437758,0.416418,0.395119,0.373871,0.352663,0.331463,0.310213,0.288832
-        ,0.267223,0.245272,0.222861,0.199882,0.176257,0.151965,0.127085,0.101852,
-         0.0767339,0.0525319,0.0305214, 0.0126308, 0.00167859, 0.00000, 0.00000, 0.00000
-        , 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000])
-
-    fig = plt.figure(figsize=(5,5))
-
-    hmod_abs = {}
-    for key, orog_i in orog.iteritems():
-
-        hmod_abs[key] = a + (b * orog_i) - orog_i
-
-        plt.plot(a - hmod_abs[key], a, label=key, color = site_bsc_colours[key])
-
-        plt.ylim([0.0, 2000.0])
-        plt.xlim([0.0, 10.0])
-        plt.ylabel('Height [m]')
-        plt.xlabel(r'$h_{sea} - h_{surface}$' + ' [m]')
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(savedir + 'a_vs_height(i).png')
+    # # plot heights a(i) and height(i)
+    # orog = {'NK':28.6743, 'KSS45W': 21.969, 'RGS': 19.9921, 'MR': 43.1841, 'IMU': 29.6641}
+    #
+    # a = np.array([5.00000,21.6667,45.0000,75.0000,111.667,155.000,205.000,261.667
+    #     ,325.000,395.000,471.667,555.000,645.000,741.667,845.000,955.000
+    #     ,1071.67,1195.00,1325.00,1461.67,1605.00,1755.00,1911.67,2075.00
+    #     ,2245.00,2421.67,2605.00,2795.00,2991.67,3195.00,3405.00,3621.67
+    #     ,3845.00,4075.00,4311.67,4555.00,4805.00,5061.67,5325.00,5595.00
+    #     ,5871.67,6155.01,6445.15,6742.49,7047.82,7362.36,7687.92,8026.93
+    #     ,8382.58,8758.92,9160.94,9594.76,10067.7,10588.3,11166.8,11814.9
+    #     ,12546.0,13375.7,14321.3,15402.7,16642.0,18063.9,19696.0,21568.9
+    #     ,23716.1,26174.7,28985.5,32192.7,35845.0,40000.0])
+    #
+    # b = np.array([0.999424,0.997504,0.994820,0.991375,0.987171,0.982215,0.976512,0.970069
+    #     ,0.962893,0.954993,0.946377,0.937057,0.927043,0.916346,0.904981,0.892961
+    #     ,0.880300,0.867014,0.853118,0.838632,0.823572,0.807957,0.791808,0.775146
+    #     ,0.757992,0.740368,0.722298,0.703807,0.684920,0.665662,0.646062,0.626146
+    #     ,0.605944,0.585484,0.564799,0.543919,0.522876,0.501704,0.480437,0.459110
+    #     ,0.437758,0.416418,0.395119,0.373871,0.352663,0.331463,0.310213,0.288832
+    #     ,0.267223,0.245272,0.222861,0.199882,0.176257,0.151965,0.127085,0.101852,
+    #      0.0767339,0.0525319,0.0305214, 0.0126308, 0.00167859, 0.00000, 0.00000, 0.00000
+    #     , 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000])
+    #
+    # fig = plt.figure(figsize=(5,5))
+    #
+    # hmod_abs = {}
+    # for key, orog_i in orog.iteritems():
+    #
+    #     hmod_abs[key] = a + (b * orog_i) - orog_i
+    #
+    #     plt.plot(a - hmod_abs[key], a, label=key, color = site_bsc_colours[key])
+    #
+    #     plt.ylim([0.0, 2000.0])
+    #     plt.xlim([0.0, 10.0])
+    #     plt.ylabel('Height [m]')
+    #     plt.xlabel(r'$h_{sea} - h_{surface}$' + ' [m]')
+    #     plt.legend()
+    #     plt.tight_layout()
+    #     plt.savefig(savedir + 'a_vs_height(i).png')
 
 
 
