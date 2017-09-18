@@ -13,7 +13,7 @@ from netCDF4 import Dataset
 import matplotlib.pyplot as plt
 
 # c_cms=2.99792e10
-c_cms=299792458
+c_cms=299792458 # speed of light
 
 # def water_vapour():
 
@@ -23,7 +23,7 @@ savedir = maindir + 'figures/water_vapour/'
 
 blk=471
 print 'water_vapour',blk
-fname= maindir + 'gas_00000001_blk_'+str(blk).zfill(8)+'.nc'
+fname= datadir + 'gas_00000001_blk_'+str(blk).zfill(8)+'.nc'
 f=Dataset(fname,'r')
 p_dim=f.dimensions['pressure']
 r_dim=f.dimensions['frequency']
@@ -51,8 +51,11 @@ lam = c_cms/freq
 
 # freq, ext = water_vapour()
 
-q_ind=13 # 3%  mass fraction water vapour / air
-t_ind=13 # 280 K
+# q_ind=13 # 3%  mass fraction water vapour / air
+# t_ind=13 # 280 K
+q_ind=12 # 1%  mass fraction water vapour / air
+t_ind=14 # 290 K / 16.85 deg C
+
 p_ind=49 # 1100 hPa (slightly on the higher side)
 
 n_plots=1
