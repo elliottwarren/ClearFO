@@ -23,7 +23,7 @@ def load_blks(blks):
     """
 
     # declare variables
-    ext = []
+    abs = []
     freq = []
     lam = []
 
@@ -52,16 +52,15 @@ def load_blks(blks):
         # vars that are different between files
         freq_Hz = f.variables['frequency'][:] # just for calculating lam
         freq.append(f.variables['frequency'][:])  # [Hz]
-        ext.append(f.variables['mass_ext_coeff'][:, :, :, :])
+        abs.append(f.variables['mass_ext_coeff'][:, :, :, :])
         lam.append(c_cms / freq_Hz)
 
     # convert appended lists to numpy arrays
     freq = np.hstack(freq) # hstack
-    ext = np.vstack(ext) # vstack (first dimension)
+    abs = np.vstack(abs) # vstack (first dimension)
     lam = np.hstack(lam)
 
-    return p, t, t_degC, ext, mass_frac, mass_frac_gkg, freq, lam
-
+    return p, t, t_degC, abs, mass_frac, mass_frac_gkg, freq, lam
 
 def normpdf(x, mean, sd):
 
@@ -96,15 +95,13 @@ maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatt
 datadir = maindir + 'data/water_vapour/'
 savedir = maindir + 'figures/water_vapour/'
 
-
 # load in variables from blocks
-blks = [470, 471, 472] # blks to load
-p, t, t_degC, ext, mass_frac, mass_frac_gkg, freq, lam = load_blks(blks)
+blks = range(467, 477) # blks to load # 905 nm in the middle of blk 471
+p, t, t_degC, abs, mass_frac, mass_frac_gkg, freq, lam = load_blks(blks)
 lam_nm = lam*1e09 # nm version
 
-
-# ext shape = (frequency, mass fraction, temperature, pressure)
-# tau = ext mass frac * water vapour mixing ratio * air density * depth
+# abs shape = (frequency, mass fraction, temperature, pressure)
+# tau = abs mass frac * water vapour mixing ratio * air density * depth
 
 # idx positions for variable values used in FO
 # q_ind=13 # 3%  mass fraction water vapour / air
@@ -114,121 +111,66 @@ t_ind=14 # 290 K / 16.85 deg C
 p_ind=49 # 1100 hPa (closest to 1013 hPa that is in the file, but there is little sensitivity to p anyway)
 
 # guassian weight
-mean = 905e-09 # nm
-sigma = 4.0
-var = 16.0
+#mean = 905e-09 # nm
+#sigma = 4.0
+#var = 16.0
 
-# --------------- FWHM = 4 nm -------------------#
 
-# FWHM = Full Width Half Maximum - CL31 have FWHM of 4 (+/-2 around 905 nm)
-FWHM = 4.0e-09
-# sigma backcalculated from FWHM: https://en.wikipedia.org/wiki/Full_width_at_half_maximum - based on wolfram alpha
-sigma = FWHM /(2 * np.sqrt(2 * np.log(2)))
-
-weights = np.array([normpdf(i, 905e-09, sigma) for i in lam])
-# weights = weights/weights.max()
-plt.plot(lam, weights)
-
-# slow function, could wait to multiply by weights once idx extraction for plotting is done.
-weighted_ext = [weights[i] * ext[i, :, :, :] for i in range(ext.shape[0])]
-
-# create avergae using the gaussian weighted values
-gaus_weight_avg = np.mean(weighted_ext,axis=0)
-gaus_weight_sum = np.sum(weighted_ext,axis=0)
-
-# gaussian weighted average
-gaus_weight_avg[q_ind, t_ind, p_ind]
-gaus_weight_sum[q_ind, t_ind, p_ind]
-
-# --------------- FWHM = 8 nm -------------------#
-
-# FWHM = Full Width Half Maximum - CL31 have FWHM of 4 (+/-2 around 905 nm)
-FWHM = 8.0e-09
-# sigma backcalculated from FWHM: https://en.wikipedia.org/wiki/Full_width_at_half_maximum - based on wolfram alpha
-sigma = FWHM /(2 * np.sqrt(2 * np.log(2)))
-
-weights = np.array([normpdf(i, 905e-09, sigma) for i in lam])
-weights = weights/weights.max()
-plt.plot(lam, weights)
-
-# slow function, could wait to multiply by weights once idx extraction for plotting is done.
-weighted_ext = [weights[i] * ext[i, :, :, :] for i in range(ext.shape[0])]
-
-# create avergae using the gaussian weighted values
-gaus_weight_avg = np.mean(weighted_ext,axis=0)
-
-# gaussian weighted average
-gaus_weight_avg[q_ind, t_ind, p_ind]
-
-# --------------- FWHM = 8 nm -------------------#
+# Calculate water vapour mass absorption for a mean wavelength of 895 - 915 nm with FWHM of 4 nm.
 
 # FWHM = Full Width Half Maximum - CL31 have FWHM of 4 (+/-2 around 905 nm)
 FWHM = 4.0e-09
 # sigma backcalculated from FWHM: https://en.wikipedia.org/wiki/Full_width_at_half_maximum - based on wolfram alpha
 sigma = FWHM /(2 * np.sqrt(2 * np.log(2)))
 
-weights = np.array([normpdf(i, 905e-09, sigma) for i in lam])
+# central wavelength the CL31 could be at
+lam_cent = np.arange(895e-09, 915e-09, 1e-09)
 
-#all weights add up to 1
-true_weights = weights/np.sum(weights)
-# weights = np.ones(len(lam)) # use with weighted_ext = np.sum... to check that weighted_ext then equals the average.
-# weights = weights/weights.max()
+# store water vapour mass absorption for the different wavelengths [np.array]
+# store gaussian weights for absra plot [list]
+wv_gaussians = []
+wv_weighted_abs = np.empty(len(lam_cent))
+wv_weighted_abs[:] = np.nan
 
-# what each value is worth (mean will have the highest weight but not 1, as all the weights need to add up to 1 in the end)
-weighted_ext_true = true_weights * ext[:, q_ind, t_ind, p_ind]
+for lam_idx, lam_i in zip(range(len(lam_cent)), lam_cent):
 
-weighted_average = np.sum(weighted_ext_true)
+    # calculate gaussian across the whole set of blks for lam_i
+    weights = np.array([normpdf(i, lam_i, sigma) for i in lam])
 
-plt.plot(lam, weights)
+    # modify weights so they add up to 1 - append value to gaussian list
+    # convex combination - https://en.wikipedia.org/wiki/Weighted_arithmetic_mean#Convex_combination_example
+    wv_gaussians_i = weights/np.sum(weights)
+    # wv_gaussians += [wv_gaussians_i]
+    wv_gaussians += [weights]
 
-# slow function, could wait to multiply by weights once idx extraction for plotting is done.
-# weighted_ext = weights * ext[:, q_ind, t_ind, p_ind]
-# from Weigner et al 2015 (eq 15) - short way to do the weighted average
-weighted_ext = np.sum(weights * ext[:, q_ind, t_ind, p_ind])/np.sum(weights)
-
-# create avergae using the gaussian weighted values
-# gaus_weight_avg = np.mean(weighted_ext)
-
-# gaussian weighted average
-# gaus_weight_avg[q_ind, t_ind, p_ind]
+    # what each value is worth (mean will have the highest weight but not 1, as all the weights need to add up to 1 in the end)
+    # store value in numpy array of predefined size
+    wv_weighted_abs[lam_idx] = np.sum(wv_gaussians_i * abs[:, q_ind, t_ind, p_ind])
 
 
 # Plotting
 
 n_plots=1
-fig1=plt.figure(1,figsize=(6,4))
+fig=plt.figure(1,figsize=(6,4))
 ax=plt.subplot(1,1,1)
-# line1=ax.plot(1.0e7/(freq[:]/c_cms),ext[:,q_ind,t_ind,p_ind], label = str(p[p_ind]))
+# line1=ax.plot(1.0e7/(freq[:]/c_cms),abs[:,q_ind,t_ind,p_ind], label = str(p[p_ind]))
 
 for i in range(len(mass_frac)):
 
-    # ax.plot(c_cms / freq[:] * 1e9, ext[:, i, t_ind, p_ind], label=str(mass_frac_gkg[i]))
+    # ax.plot(c_cms / freq[:] * 1e9, abs[:, i, t_ind, p_ind], label=str(mass_frac_gkg[i]))
     #
-    # ax.plot([c_cms /freq[0]* 1e9, c_cms /freq[-1]* 1e9], [np.mean(ext[:, i, t_ind, p_ind]),np.mean(ext[:, i, t_ind, p_ind])])
+    # ax.plot([c_cms /freq[0]* 1e9, c_cms /freq[-1]* 1e9], [np.mean(abs[:, i, t_ind, p_ind]),np.mean(abs[:, i, t_ind, p_ind])])
     #         #,label='avg ' + str(mass_frac_gkg[i]))
 
-    ax.plot(c_cms / freq[:] * 1e9, ext[:, i, t_ind, p_ind], label=str(mass_frac_gkg[i]))
+    ax.plot(c_cms / freq[:] * 1e9, abs[:, i, t_ind, p_ind], label=str(mass_frac_gkg[i]))
 
 
-# ax.plot(c_cms/freq[:] * 1e9,ext[:,q_ind,t_ind,p_ind], label = str(t_degC[t_ind]))
-# ax.plot(c_cms/freq[:] * 1e9,ext[:,q_ind,t_ind,p_ind], label = str(t_degC[t_ind]))
-# ax.plot(c_cms/freq[:] * 1e9,ext[:,q_ind,t_ind,p_ind], label = str(t_degC[t_ind]))
-# ax.plot(c_cms/freq[:] * 1e9,ext[:,q_ind,t_ind,p_ind], label = str(t_degC[t_ind]))
-# ax.plot(c_cms/freq[:] * 1e9,ext[:,q_ind,t_ind,p_ind], label = str(t_degC[t_ind]))
-#
-# ax.axhline(np.mean(ext[:,q_ind,t_ind-1,p_ind]), label = 'avg ' + str(t_degC[t_ind]), color='red')
-# ax.axhline(np.mean(ext[:,q_ind,t_ind,p_ind]), label = 'avg ' + str(t_degC[t_ind]), color = 'black')
-# ax.axhline(np.mean(ext[:,q_ind,t_ind+1,p_ind]), label = 'avg ' + str(t_degC[t_ind+1]), color='cyan')
-# ax.axhline(np.mean(ext[:,q_ind,t_ind+2,p_ind]), label = 'avg ' + str(t_degC[t_ind+2]), color='cyan')
-# ax.axhline(np.mean(ext[:,q_ind,t_ind+3,p_ind]), label = 'avg ' + str(t_degC[t_ind+3]), color='cyan')
-# diff = ext[:,q_ind,t_ind,p_ind] - ext[:,q_ind,t_ind,p_ind-1]
-# line2=ax.plot(c_cms/freq[:] * 1e9,diff, label = str(p[p_ind-1]))
 ax.set_xlabel(r"Wavelength [nm]",fontsize=14, labelpad=0.1)
 ax.set_ylabel(r"Mass absorption [m2kg-1]",fontsize=14)
 ax.tick_params(labelsize=14)
 # plt.ylim([0.0, 0.3])
-plt.suptitle('r [g kg-1]; 1g avg = ' + str(np.mean(ext[:, -5, t_ind, p_ind])) + '; 100 g avg = ' +
-             str(np.mean(ext[:, -1, t_ind, p_ind])))
+plt.suptitle('r [g kg-1]; 1g avg = ' + str(np.mean(abs[:, -5, t_ind, p_ind])) + '; 100 g avg = ' +
+             str(np.mean(abs[:, -1, t_ind, p_ind])))
 plt.legend(fontsize=8)
 plt.grid()
 
@@ -237,3 +179,35 @@ if type(blks) == list:
         plt.savefig(savedir + 'r_variable_blk' + str(blks[0]) + '.png') # single blks
     elif len(blks) > 1:
         plt.savefig(savedir + 'r_variable_blks' + str(blks[0]) + '-' + str(blks[-1]) + '.png')
+
+plt.close(fig)
+
+# ------------------
+
+# plot change in water vapour mass absorption wrt central wavelength
+fig=plt.figure(1,figsize=(6,4))
+ax=plt.subplot(1,1,1)
+
+ax.plot(lam_cent * 1e9, wv_weighted_abs)
+ax.set_ylabel('wv absorption [m2 kg-1]')
+ax.set_xlabel('wavelength [nm]')
+plt.savefig(savedir + 'wv_mass_abs_wrt_centralLam.png')
+
+plt.close(fig)
+# ------------------------------------
+
+# plot the guassians
+fig=plt.figure(1,figsize=(6,4))
+ax=plt.subplot(1,1,1)
+
+for gaus_i, lam_cent_i in zip(wv_gaussians, lam_cent):
+
+    ax.plot(lam * 1e9, gaus_i, label=str(lam_cent_i * 1e9))
+
+
+ax.set_ylabel('weighting')
+ax.set_xlabel('wavelength [nm]')
+ax.legend()
+plt.savefig(savedir + 'wv_mass_abs_gaussians_wrt_centralLam.png')
+
+plt.close(fig)
