@@ -1,5 +1,5 @@
 """
-Correlated UKV variables between sites
+Plot sensible head flux (Q_H) at KSSW and several location+height combinations from the UKV
 
 Created by Elliott Tues 29/06/17
 """
@@ -13,51 +13,8 @@ from matplotlib.dates import DateFormatter
 
 from forward_operator import FOUtils as FO
 from forward_operator import FOconstants as FOcon
+import ellUtils as eu
 
-# def create_stats_entry(site_id, statistics={}):
-#
-#     """
-#     Define or expand the almighty statistics array
-#
-#     :param site_bsc:
-#     :param mbe_limit_max:
-#     :param mbe_limit_step:
-#     :return: statistics (dict)
-#
-#     statistics[site]['r'] = [...]
-#     statistics[site]['MBE'] = {'0-500': ..., '500-1000': ...}
-#     statistics[site]['time'] = [...]
-#     """
-#
-#     # statistics will be grouped based on hour, so create a simple hourly array [0 ... 23]
-#     hrs = np.arange(0, 24)
-#
-#     # Structure of statistics:
-#     # statistics[site]['r'] = [...]
-#     # statistics[site]['MBE'] = {'0-500': ..., '500-1000': ...}
-#     # statistics[site]['time'] = [...]
-#
-#     if site_id not in statistics:
-#
-#         # define site based lists to store the correlation results in
-#         statistics[site_id] = {'r': [], 'p': [],
-#                                'diff': [],
-#                                'aer_diff': [],
-#                                'aer_mod': [],
-#                                'aer_obs': [],
-#                                'rh_diff': [],
-#                                'rh_mod': [],
-#                                'rh_obs': [],
-#                                'back_point_diff': [],
-#                                'RMSE': [],
-#                                'MBE': [],
-#                                'hr': []}
-#
-#         # for key in statistics[site_id].iterkeys():
-#         #     for hr in hrs:
-#         #         statistics[site_id][key][str(hr)] = []
-#
-#     return statistics
 
 def dateList_to_datetime(dayList):
 
@@ -124,16 +81,6 @@ def main():
     # variable to compare (whatever the mod_site_extract_calc function has named them)
     variable = 'Q_H'
 
-    # define statistics dictionary
-    statistics = {}
-    sampleSize = 0 # add to this
-
-    # store RH(z = z_i) for each
-    var_MR = []
-    var_KSS45W = []
-
-    time_MR = []
-    time_KSS45W = []
 
     # ==============================================================================
     # Read data
@@ -142,7 +89,8 @@ def main():
     # Read Ceilometer metadata
 
     # ceilometer list to use
-    ceilsitefile = 'UKV_correlatesites.csv'
+    # ceilsitefile = 'UKV_correlatesites.csv'
+    ceilsitefile = 'CeilsCSV_qgis_map.csv'
     ceil_metadata = FO.read_ceil_metadata(datadir, ceilsitefile)
 
     for day in days_iterate:
@@ -155,79 +103,51 @@ def main():
         # reads all london model data, extracts site data, stores in single dictionary
         mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910, version=0.2, allvars=True)
 
+        # read in CSAT Q_H obs
+        datapath = datadir + 'L1/CSAT3_ECpack_KSSW_2016019_30min.nc'
+        CSAT3 = eu.netCDF_read(datapath, vars='')
 
+        time_obs = CSAT3['time']
+        var_obs = CSAT3['Q_H']
 
         # idx heights to pull z
-        zidx_mr = 3
-        zidx_kss45w = 3
+        zidx = 3
 
-        # actual heights of both
-        z_mr = mod_data['MR']['level_height'][zidx_mr]
-        z_kss45w = mod_data['MR']['level_height'][zidx_kss45w]
+        # LINE PLOT
+        fig, ax = plt.subplots(1, 1, figsize=(6, 2.5))
 
-        # store these for correlating later
-        var_MR += [mod_data['MR'][variable][:, zidx_mr]]
-        var_KSS45W += [mod_data['KSS45W'][variable][:, zidx_kss45w]]
+        # actual heights of UKV data
+        for site in ceil_metadata.iterkeys():
+            z_mod = mod_data[site]['level_height'][zidx]
+            # z_kss45w = mod_data['KSS45W']['level_height'][zidx]
 
-        # store their times
-        time_MR += [mod_data['MR']['time']]
-        time_KSS45W += [mod_data['KSS45W']['time']]
+            # store these for correlating later
+            var_mod = mod_data[site][variable][:, zidx]
+            # var_mod_kss45w = mod_data['KSS45W'][variable][:, zidx]
 
-    var_MR = np.hstack(var_MR)
-    var_KSS45W = np.hstack(var_KSS45W)
+            # store their times - same for all model areas so just use MR
+            # time_mod = mod_data['MR']['time']
+            time_mod = mod_data[site]['time']
 
-    time_MR = np.hstack(time_MR)
-    time_KSS45W = np.hstack(time_KSS45W)
+            plt.plot_date(time_mod, var_mod, linestyle='-', marker='o', markersize=4, label=r'$Q_{H,'+site+'}$')
+        # plt.plot_date(time_mod, var_mod_kss45w, linestyle='-', marker='o', markersize=4, label='$Q_{H,KSS45W}$')
+        plt.plot_date(time_obs, var_obs, linestyle='-', marker='o', markersize=4, label=r'$Q_{H,o}$')
+        plt.axhline(0, linestyle='--', alpha=0.5)
 
-    # do correlation
-    corr = {}
-    corr['r'], corr['p'] = spearmanr(var_MR, var_KSS45W, nan_policy='omit')
-    n = len(var_MR)
+        ax.set_xlabel(r'$Time \/\/[HH:MM]$')
+        ax.set_ylabel(r'$Q_{H} \/\/[W\/m^{-2}]$')
+        ax.set_ylim([-10.0, 100.0])
+        ax.set_xlim([day, day + dt.timedelta(days=1)])
+        ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
+        #plt.suptitle('Q_H z_mr=' + str(z_mr) + 'm.png')
+        plt.legend(fontsize=10)
+        plt.tight_layout()
 
-    print 'r = ' + str(corr['r'])
-    print 'p = ' + str(corr['p'])
+        # fname = variable+'_MR' + '_' + str(z_mr) + 'm_'+ 'm_lineplot.png'
+        fname = variable + '_5sites_lineplot.png'
+        plt.savefig(savedir + 'point_diff/picking_heights/' + fname)
 
-    # SCATTER
-    # plt.plot([-250.0, 2000.0], [-250.0, 2000.0], color='black')
-    # plt.scatter(RH_MR*100.0, RH_KSS45W*100.0)
-    # plt.xlabel('MR')
-    # plt.ylabel('KSS45W')
-    # plt.suptitle(str(len(daystrList)) + ' sample days; n=' + str(n) + '; z_mr=' + str(z_mr) + 'm ; z_kss45w=' + str(z_kss45w) + 'm\n'
-    #               'r=' + str(corr['r']) + '; p=' + str(corr['p']))
-    #
-    # fname = 'corr_'+variable+'_MR' + '_' + str(z_mr) + 'm-KSS45W_' + str(z_kss45w) + 'm.png'
-    # plt.savefig(savedir + 'point_diff/picking_heights/' + fname)
-
-    # LINE PLOT
-    plt.plot_date(time_MR, var_MR, '-', label='MR')
-    plt.plot_date(time_KSS45W, var_KSS45W, '-', label='KSS45W')
-    plt.xlabel('time')
-    plt.ylabel('Q_H')
-    ax = plt.gca()
-    ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
-    plt.suptitle(str(len(daystrList)) + ' sample days; n=' + str(n) + '; z_mr=' + str(z_mr) + 'm ; z_kss45w=' + str(z_kss45w) + 'm\n'
-                  'r=' + str(corr['r']) + '; p=' + str(corr['p']))
-    plt.legend()
-
-    fname = 'corr_'+variable+'_MR' + '_' + str(z_mr) + 'm-KSS45W_' + str(z_kss45w) + 'm_lineplot.png'
-    plt.savefig(savedir + 'point_diff/picking_heights/' + fname)
-
-    # plt.close('all')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    plt.close('all')
 
 
     return
