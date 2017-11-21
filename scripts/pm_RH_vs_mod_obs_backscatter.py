@@ -546,10 +546,10 @@ def main():
     bin_start = -50
     bin_end = 125
 
-    bin_start_all = np.arange(bin_start, bin_end, bin)
-    bin_end_all = np.arange(bin_start+bin, bin_end+bin, bin)
-    pos = np.arange(bin_start + (0.5*bin), bin_end, bin)
-    bin_widths = np.repeat(bin, len(pos))
+    bin_start_all = np.arange(bin_start, bin_end, bin) # only start of each bin
+    bin_end_all = np.arange(bin_start+bin, bin_end+bin, bin) # end of each bin
+    pos = np.arange(bin_start + (0.5*bin), bin_end, bin) # centre position of each bin
+    bin_widths = np.repeat(bin, len(pos)) # width of every bin
 
     # -50 to 100
     for bin_s_i, bin_e_i in zip(bin_start_all, bin_end_all):
@@ -564,18 +564,36 @@ def main():
         MAE['AE'] += [np.array(statistics[site_id]['abs_back_diff_norm'])[m_bin_idx]]
         MAE['stddev MAE'] += [np.nanstd(np.array(statistics[site_id]['abs_back_diff_norm'])[m_bin_idx])]
         MAE['aer_diff'] += [[bin_s_i, bin_e_i]]
-        # MAE['n'] += [len(m_bin_idx)]
+        MAE['n'] += [len(m_bin_idx)]
         # MAE['n'] += [1 if type(m_bin_idx)...
 
     # plot MAE
-    fig, ax = plt.subplots(1, 1, figsize=(5, 4))
-    ax.boxplot(MAE['AE'], widths=bin, positions=pos, whis=[5, 95])
+    fig, ax = plt.subplots(1, 1, figsize=(6, 3.5))
+    ax.boxplot(MAE['AE'], widths=bin, positions=pos, whis=[5, 95], sym='x')
+
+    # prettify
     ax.set_xlim([bin_start, bin_end])
+    ax.set_xticks(np.arange(bin_start, bin_end+bin, bin))
+    ax.set_xticklabels(np.arange(bin_start, bin_end+bin, bin))
+    ax.set_xlabel(r'$Difference \/\mathrm{(m_{MURK} - PM_{10})}$')
+    ax.set_ylabel(r'$Absolute \/\/Error\/\/\/ \mathrm{(|\beta_m - \beta_o|)}$')
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+    ax.set_ylim([0.0, 5.5e-06])
+
+    # add sample size at the top of plot for each box and whiskers
+    # pos_t = np.arange(numBoxes) + 1
+    upperLabels = [str(np.round(n, 2)) for n in MAE['n']]
+    weights = ['bold', 'semibold']
+    for tick, label in zip(range(len(pos)), ax.get_xticklabels()):
+        k = tick % 2
+        ax.text(pos[tick], 5.5e-06 - (5.5e-06 * 0.05), upperLabels[tick],
+                 horizontalalignment='center', size='x-small')
+
+    plt.subplots_adjust(left=0.1)
     plt.tight_layout()
-
-
     plt.savefig(savedir + 'mae/' +
-                '')
+                'MAE_clearSkyPeriod_median_IQR_meanDots.png')
+    plt.close(fig)
 
 
 
