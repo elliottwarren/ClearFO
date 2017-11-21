@@ -1,6 +1,8 @@
 """
 Plot the PM10 or RH near surface difference, against mod - obs attenuated backscatter
 
+Also calculate Mean Absolute Error (MAE) binned by delta_m
+
 Created by Elliott Tues 09/05/17
 """
 
@@ -9,6 +11,7 @@ import matplotlib.colors as mcolors
 import matplotlib.cm
 import matplotlib as mpl
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.ticker import FormatStrFormatter
 
 import numpy as np
 import datetime as dt
@@ -55,6 +58,8 @@ def create_stats_entry(site_id, statistics={}):
                                'rh_obs': [],
                                'back_diff_log': [],
                                'back_diff_norm': [],
+                               'abs_back_diff_log': [],
+                               'abs_back_diff_norm': [],
                                'back_obs': [],
                                'back_mod': [],
                                'RMSE': [],
@@ -134,8 +139,7 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
     cmap, norm = discrete_colour_map(40, 100, 13)
 
     # plot data
-    scat = plt.scatter(var_diff, back_point_diff, c=stats_site[c_type], s=6, vmin=40.0, vmax=100.0, cmap=cmap, norm=norm,
-                       )
+    scat = plt.scatter(var_diff, back_point_diff, c=stats_site[c_type], s=6, vmin=40.0, vmax=100.0, cmap=cmap, norm=norm)
 
     # add 0 lines
     ax.axhline(linestyle='--', color='grey', alpha=0.5)
@@ -146,13 +150,15 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
     # add colourbar on the side
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(scat, cax=cax, norm=norm)
+    cbar = plt.colorbar(scat, cax=cax, norm=norm)
+    cbar.set_label(r'$RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
 
 
     ax.set_xlabel(xlab)
     ax.set_ylim([-1e-5, 1e-5])
     # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
     ax.set_ylabel(r'$Difference \/\mathrm{(\beta_m - \beta_o)}$')
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
 
     # Fake a ScalarMappable so I can display a colormap
     # cmap, norm = mcolors.from_levels_and_colors(range(24 + 1), rgb)
@@ -275,8 +281,8 @@ def main():
     aerDatadir = datadir + 'LAQN/'
 
     # statistics to run
-    pm10_stats = False
-    rh_stats = True
+    pm10_stats = True
+    rh_stats = False
 
     # # instruments and other settings
     #site_rh = FOcon.site_rh
@@ -292,13 +298,13 @@ def main():
     #site_rh = {'Davis_IMU': 72.8}
     #rh_instrument = site_rh.keys()[0]
 
-    # pm10
+    # # pm10
     site = 'MR'
     ceil_id = 'CL31-C'
     # ceil = ceil_id + '_BSC_' + site
     ceil = ceil_id + '_' + site
 
-    ## rh
+    # rh
     #site = 'KSS45W'
     #ceil_id = 'CL31-A'
     ## ceil = ceil_id + '_BSC_' + site
@@ -319,8 +325,8 @@ def main():
 
     # day list
     # clear sky days (5 Feb 2015 - 31 Dec 2016)
-    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-    #               '20161129', '20161130', '20161204']
+    daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+                  '20161129', '20161130', '20161204']
 
     if site == 'KSS45W':
     # KSS45W days
@@ -343,10 +349,6 @@ def main():
 
     days_iterate = dateList_to_datetime(daystrList)
 
-
-
-    # correlation max height
-    corr_max_height = 2000
 
     # ceilometer gate number to use for backscatter comparison
     # 1 - noisy
@@ -491,6 +493,9 @@ def main():
                 # all extra stats slots
                 statistics[site_id]['back_diff_log'] += [np.log10(mod_back_i) - np.log10(obs_back_i)]
                 statistics[site_id]['back_diff_norm'] += [mod_back_i - obs_back_i]
+                statistics[site_id]['abs_back_diff_norm'] += [np.abs(mod_back_i - obs_back_i)]
+                statistics[site_id]['abs_back_diff_log'] += [np.abs(np.log10(mod_back_i) - np.log10(obs_back_i))]
+
 
 
 
@@ -517,7 +522,9 @@ def main():
         a1 = np.array(statistics[site_id]['aer_diff']) # extract the aerosol difference dataset from statistics
     # plot!
 
+    # ----------------
 
+    # pearson correlation
     b1 = np.array(statistics[site_id]['back_diff_norm'])
 
     a1_idx = np.where(np.isnan(a1))
@@ -530,16 +537,64 @@ def main():
 
     pearsonr(a1[an_idx],b1[an_idx])
 
+    # --------------
+
+    # calculate mean absolute error, binned by delta_m (n = sample size)
+    MAE = {'MAE': [], 'AE': [], 'stddev MAE': [], 'aer_diff': [], 'n': []}
+
+    bin = 25.0
+    bin_start = -50
+    bin_end = 125
+
+    bin_start_all = np.arange(bin_start, bin_end, bin)
+    bin_end_all = np.arange(bin_start+bin, bin_end+bin, bin)
+    pos = np.arange(bin_start + (0.5*bin), bin_end, bin)
+    bin_widths = np.repeat(bin, len(pos))
+
+    # -50 to 100
+    for bin_s_i, bin_e_i in zip(bin_start_all, bin_end_all):
+
+        # find all abs_back_diff_norm for current bin
+        m_bin_bool = np.logical_and(statistics[site_id]['aer_diff'] >= bin_s_i,
+                                    statistics[site_id]['aer_diff'] <= bin_e_i)
+        m_bin_idx = np.where(m_bin_bool == True)[0]
+
+        # fill MAE statistics
+        MAE['MAE'] += [np.nanmean(np.array(statistics[site_id]['abs_back_diff_norm'])[m_bin_idx])]
+        MAE['AE'] += [np.array(statistics[site_id]['abs_back_diff_norm'])[m_bin_idx]]
+        MAE['stddev MAE'] += [np.nanstd(np.array(statistics[site_id]['abs_back_diff_norm'])[m_bin_idx])]
+        MAE['aer_diff'] += [[bin_s_i, bin_e_i]]
+        # MAE['n'] += [len(m_bin_idx)]
+        # MAE['n'] += [1 if type(m_bin_idx)...
+
+    # plot MAE
+    fig, ax = plt.subplots(1, 1, figsize=(5, 4))
+    ax.boxplot(MAE['AE'], widths=bin, positions=pos, whis=[5, 95])
+    ax.set_xlim([bin_start, bin_end])
+    plt.tight_layout()
+
+
+    plt.savefig(savedir + 'mae/' +
+                '')
+
+
+
+
+    # ---------------
+
+
+
+
     # pass in statistics with site id!
     if pm10_stats == True:
         plot_back_point_diff(statistics[site_id],
                                    savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type='aerosol',
-                                   c_type='rh_mod', extra = '_lt' + str(int(val)) + '_log')
+                                   c_type='rh_mod', extra = '')
 
     if rh_stats == True:
         plot_back_point_diff(statistics[site_id],
                                    savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type='RH',
-                                   c_type='aer_mod')
+                                   c_type='rh_mod')
 
 
     plt.close('all')
@@ -551,7 +606,6 @@ def main():
     # plt.ylabel('log back diff')
     # plt.ylim([min(statistics[site_id]['back_obs']), max(statistics[site_id]['back_obs'])])
     # plt.suptitle('r=' + str(r) + '; p='+str(p))
-
 
 
     # # plot heights a(i) and height(i)
@@ -593,6 +647,7 @@ def main():
     #     plt.legend()
     #     plt.tight_layout()
     #     plt.savefig(savedir + 'a_vs_height(i).png')
+
 
 
 
