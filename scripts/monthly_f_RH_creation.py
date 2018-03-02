@@ -10,7 +10,11 @@ from scipy.optimize import curve_fit
 from scipy import interpolate
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
-import matplotlib
+import pickle
+from netCDF4 import Dataset
+import datetime as dt
+
+# Reading
 
 def read_spec_bands(file_path):
 
@@ -137,6 +141,8 @@ def read_aer_data(file_path, aer_index, aer_order, band=1):
 
     return data
 
+# Processing
+
 def calc_f_RH(data, aer_order, Q_type=''):
 
     """
@@ -168,11 +174,74 @@ def calc_f_RH(data, aer_order, Q_type=''):
             raise ValueError("Incorrect Q_type value. Needs to be either 'extinction', 'absorption', or 'scattering'")
 
         # calculate f(RH) = Q(RH>=0)/Q(RH=0)
-        f_RH[aer] = [Q_RH / Q[aer][0] for Q_RH in Q[aer]]
+        f_RH[aer] = np.array([Q_RH / Q[aer][0] for Q_RH in Q[aer]])
 
     return Q, f_RH
 
+# Saving
+
+def save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_nm_str):
+    """
+    Create a netCDF file for the f(RH) information to be stored in.
+    :param fRHdir: dircetory to save netCDF file to (should ideally be the monthly f(RH) dir)
+    :param f_RH: f(RH) curves
+    :param radii_range_nm: needs to match the units if changed! [currently nm]
+    :param RH_int: interpolated RH values [fraction]
+    :param site_ins: site information
+    :param ceil_lambda_nm_str: ceilometer wavelength as str with nm on the end e.g. '905.0nm'
+    :return:
+
+    Store the MURK [month, radius, RH] AND species f(RH) curves [radius, RH]
+    """
+
+    # create netCDF file
+    ncfile = Dataset(fRHdir + 'monthly_f(RH)_' + site_ins['site_short'] + '_' + ceil_lambda_nm_str + '.nc', 'w')
+
+    # create Dimensions
+    ncfile.createDimension('month', len(np.arange(1, 13)))
+    ncfile.createDimension('RH', len(RH_int))
+    ncfile.createDimension('radii_range', len(radii_range_nm))
+
+    # create, fill and set units for co-ordinate variables
+    nc_month = ncfile.createVariable('months', np.float64, ('month',))
+    nc_RH = ncfile.createVariable('Relative Humidity', np.float64, ('RH',))
+    nc_radii_range_nm = ncfile.createVariable('radii_range_nm', np.float64, ('radii_range',))
+
+    nc_month[:] = np.arange(1, 13)
+    nc_RH[:] = RH_int
+    nc_radii_range_nm[:] = radii_range_nm
+
+    nc_month.units = 'month number'
+    nc_RH.units = 'fraction'
+    nc_radii_range_nm.units = 'nm'
+
+    # create and fill variables
+    nc_f_RH_MURK = ncfile.createVariable('f(RH) MURK', np.float64, ('month', 'radii_range', 'RH'))
+    nc_f_RH_MURK[:] = f_RH['MURK']
+    for species_i in f_RH.keys():
+        var_name = 'f(RH) ' + species_i
+        nc_f_RH_species_i = ncfile.createVariable(var_name, np.float64, ('radii_range', 'RH'))
+        nc_f_RH_species_i[:] = f_RH[species_i]
+
+    # extra attributes
+    ncfile.history = 'Created ' + dt.datetime.now().strftime('%Y-%m-%d %H:%M') + ' GMT'
+
+    return
+
 if __name__ == '__main__':
+
+    # ------------------------------------------
+    # Setup
+    # ------------------------------------------
+    # site information
+    site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
+                'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
+    # site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
+    #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
+    # site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
+    #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
+
+    ceil_lambda_nm_str = str(site_ins['ceil_lambda'] * 1e9) + 'nm'
 
     # User set args
     # band that read_spec_bands() uses to find the correct band
@@ -180,43 +249,28 @@ if __name__ == '__main__':
     band = 1
 
     # saveF(RH)?
-    saveFRH = False
+    saveFRH = True
 
     # -------------------------
 
     # directories
     savedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/figures/Mie/f(RH)/'
-    specdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/spectral/'
-    f_RHdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/'
+    fRHdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/monthly_f(RH)/'
+    specdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/' \
+              'monthly_f(RH)/sp_885-925_r_files/'
+    pickleloaddir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/pickle/'
 
-    # file_name = 'spec3a_sw_hadgem1_7lean_so' # original file given to me by Claire Ryder 25/01/17
-    # file_name = 'sp_sw_ga7' # current UM file
-    file_name = 'sp_ew_ceil_905'
-    # file_name = 'sp_895-915_r1.1e-7_stdev1.6_num8.0e9_salt8.0e-6'
-    # file_name = 'sp_908-912_r1.1e-7_stdev1.6_num8.0e9' # 6 different aerosols inc. salt, biogenic and soot
-    file_path = specdir + file_name
 
     # variables to take from file (as listed within the file) with index from BLOCK = 0
     # NOTE: data MUST be in ascending index order
-    if file_name == 'spec3a_sw_hadgem1_7lean_so':
-        aer_index = {'Accum. Sulphate': 6, 'Aitken Sulphate': 7, 'Aged fossil-fuel OC': 22}
-        aer_order = ['Accum. Sulphate', 'Aitken Sulphate', 'Aged fossil-fuel OC']
-    elif file_name == 'sp_ew_ceil_guass_903-907':
-        aer_index = {'Accum. Sulphate': 1, 'Aged fossil-fuel OC': 2, 'Ammonium nitrate': 3}
-        aer_order = ['Accum. Sulphate', 'Aged fossil-fuel OC', 'Ammonium nitrate']
-    elif file_name == 'sp_895-915_r1.1e-7_stdev1.6_num8.0e9_salt8.0e-6':
-        aer_index = {'Ammonium Sulphate': 1, 'Generic NaCl': 2, 'Biogenic': 3, 'Aged fossil-fuel OC': 4, 'Ammonium nitrate': 5}
-        aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Biogenic', 'Aged fossil-fuel OC', 'Ammonium nitrate']
-    elif file_name == 'sp_ew_ceil_905':
-        aer_index = {'Ammonium Sulphate': 1, 'Generic NaCl': 2, 'Biogenic': 3, 'Aged fossil-fuel OC': 4,
-                     'Ammonium nitrate': 5}
-        aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Biogenic', 'Aged fossil-fuel OC', 'Ammonium nitrate']
+    aer_index = {'Ammonium Sulphate': 1, 'Generic NaCl': 2, 'Biogenic': 3, 'Aged fossil-fuel OC': 4,
+                 'Ammonium nitrate': 5}
+    aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Biogenic', 'Aged fossil-fuel OC', 'Ammonium nitrate']
 
-    else:
-        aer_index = {'Ammonium Sulphate': 2, 'Generic NaCl': 3, 'Biogenic': 4, 'Aged fossil-fuel OC': 5, 'Ammonium nitrate': 6}
-        aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Biogenic', 'Aged fossil-fuel OC', 'Ammonium nitrate']
-        # aer_index = {'Accum. Sulphate': 14, 'Aitken Sulphate': 15, 'Aged fossil-fuel OC': 24, 'Ammonium nitrate': 26}
-        # aer_order = ['Accum. Sulphate', 'Aitken Sulphate', 'Aged fossil-fuel OC', 'Ammonium nitrate']
+    aer_particles_chem = {'Ammonium Sulphate': '(NH4)2SO4', 'Generic NaCl': 'NaCl', 'Aged fossil-fuel OC': 'CORG',
+                          'Ammonium nitrate': 'NH4NO3', 'Black carbon': 'CBLK'}
+
+    aer_particles = ['(NH4)2SO4', 'NH4NO3', 'NaCl', 'CORG', 'CBLK']
 
     # Q type to use in calculating f(RH)
     Q_type = 'extinction'
@@ -226,72 +280,110 @@ if __name__ == '__main__':
     # Read, Process and save f(RH)
     # ---------------------------------------------------
 
-    # read in the spectral band information
-    spec_bands = read_spec_bands(file_path)
+    # read in relative volume of aerosol species
+    #   created in VMachine "create_Qext_for_MURK_.py" and saved as a pickle
+    # # read in any pickled S data from before
+    filename = pickleloaddir + site_ins['site_short'] + '_aerosol_relative_volume.pickle'
+    with open(filename, 'rb') as handle:
+        pickle_load_in = pickle.load(handle)
+    pm10_rel_vol = pickle_load_in['pm10_rel_vol']
 
-    # wavelength range in current band
-    band_idx = np.where(spec_bands['band'] == band)[0][0]
-    band_lam_range = '%.0f' % (spec_bands['lower_limit'][band_idx] * 1.0e9) + '-' + \
-                     '%.0f' % (spec_bands['upper_limit'][band_idx] * 1.0e9) + 'nm'
+    # range of radii to iterate over
+    radii_range_m = np.arange(0.005e-06, 2.885e-6, 0.005e-06)
+    radii_range_micron = np.arange(0.005, 2.885, 0.005)
+    radii_range_nm = np.arange(5, 2885 + 5, 5)
+
+    # RH to interpolate to
+    RH_int = np.arange(0, 1.01, 0.01)
+
+    # create f(RH) dictionaries to fill (including one for murk)
+    #   MURK data will be in a 3D array [month, size, RH]
+    #   all other speices will be 2D [size, RH] as they wont vary each month
+    f_RH = {}
+    f_RH['MURK'] = np.empty((12, len(radii_range_nm), 101))
+    f_RH['MURK'][:] = np.nan
+    for species_i in aer_particles:
+        f_RH[species_i] = np.empty((len(radii_range_nm), 101))
+        f_RH[species_i][:] = np.nan
 
 
-    # read the aerosol data
-    data = read_aer_data(file_path, aer_index, aer_order, band=band)
+    for radius_idx, radius_nm_i in enumerate(radii_range_nm):
 
-    # Extract RH (RH is the same across all aerosol types)
-    RH = np.array(data[aer_order[0]][:, 0])
+        print radius_idx
 
-    # calculate f(RH)
-    Q, f_RH = calc_f_RH(data, aer_order, Q_type=Q_type)
+        # format of radius used in the filename
+        #   trying to use m or microns leads to rounding errors when making the string...
+        radius_filestr = '0.%09d' % radius_nm_i
+
+        # create filename
+        filename = 'sp_885-925_r'+radius_filestr+'_stdev1.6_num4.461e9'
+        file_path = specdir + filename
+
+        # read in the spectral band information
+        spec_bands = read_spec_bands(file_path)
+
+        # wavelength range in current band
+        band_idx = np.where(spec_bands['band'] == band)[0][0]
+        band_lam_range = '%.0f' % (spec_bands['lower_limit'][band_idx] * 1.0e9) + '-' + \
+                         '%.0f' % (spec_bands['upper_limit'][band_idx] * 1.0e9) + 'nm'
+
+        # read the aerosol data
+        data = read_aer_data(file_path, aer_index, aer_order, band=band)
+
+        # Extract RH (RH is the same across all aerosol types)
+        RH = np.array(data[aer_order[0]][:, 0])
+
+        # calculate f(RH) for each species
+        Q, f_RH_i = calc_f_RH(data, aer_order, Q_type=Q_type)
+
+        # add a soot f_RH
+        f_RH_i['Soot'] = np.array([1.0 for i in f_RH_i['Generic NaCl']])
 
 
+        # linearly interpolate f(RH) to increase resolution from 0.05 to 0.01 [fraction]
+        interp_f_RH_i = {}
+        # soot is always the same (fixed at 1)
+        interp_f_RH_i['Soot'] = np.repeat(1.0, 101)
+        # all species but not including soot
+        for species_i in aer_index.iterkeys():
+            f = interp1d(RH, f_RH_i[species_i], kind='linear')
+            interp_f_RH_i[species_i] = f(RH_int)
+            f_RH[species_i][radius_idx, :] = interp_f_RH_i[species_i]
 
-    # # interpolate f(RH) to increase resolution from 5% to 0.1%
-    # # fit binomial
-    # # m = np.polyfit(RH*100.0, f_RH_5['Generic NaCl'], 3)
-    # tck = interpolate.splrep(RH*100.0, f_RH_5['Generic NaCl'], s=1)
-    # ynew = interpolate.splev(np.arange(101), tck, der=0)
-    #
-    # (A, B), covvariances = curve_fit(lambda t, a, b: a * np.exp(b * t), RH[6:]*100.0, f_RH_5['Generic NaCl'][6:], p0=(2, 0.2))
-    # f = interp1d(RH*100.0, f_RH_5['Generic NaCl'], kind='cubic') # output is a function
-    # f2 = interp1d(RH * 100.0, f_RH_5['Generic NaCl'], kind='quadratic')
 
-    # plot binomial
-    #plt.plot(np.arange(101), ynew, label='cubic spline')
-    #plt.plot(np.arange(101), (m[0] * (np.arange(101)**3)) + (m[1] * (np.arange(101)**2)) + (m[2]*(np.arange(101)**1)) + (m[3]), label='2deg')
-    # plt.plot(np.arange(101), (m[0] * (np.arange(101)**5)) + (m[1]*(np.arange(101)**4)) + (m[2]*(np.arange(101)**3)) +
-    #                          (m[3] * (np.arange(101) ** 2)) + (m[4] * (np.arange(101))) + m[5], label='5deg')
-    #plt.plot(np.arange(101), A*np.exp(np.arange(101)*B), label='exp')
-    #plt.plot(np.arange(101), f(np.arange(101)), label='interp1d cubic')
-    #plt.plot(np.arange(101), f2(np.arange(101)), label='quadratic')
-    # plt.plot(RH*100, f_RH['Generic NaCl'], label='orig')
-    # plt.legend()
+            # store the interpolated f(RH) for each species
 
-    # add a soot f_RH
-    f_RH['Soot'] = [1.0 for i in f_RH['Generic NaCl']]
 
-    # create an average f(RH)
-    # f_RH['average with Aitken Sulphate'] = np.mean(f_RH.values(), axis=0)
-    # f_RH['average'] = np.mean((f_RH['Ammonium Sulphate'], f_RH['Aged fossil-fuel OC'], f_RH['Ammonium nitrate']), axis=0)
-    f_RH['MURK'] = (np.array(f_RH['Ammonium Sulphate']) * 0.295) + (0.38 * np.array(f_RH['Aged fossil-fuel OC'])) + \
-    (0.325 * np.array(f_RH['Ammonium nitrate']))
+        # make f(RH) for murk from the interpolated f(RH)
+        for month_idx in range(12):
+            f_RH['MURK'][month_idx, radius_idx, :] = \
+                interp_f_RH_i['Ammonium Sulphate'] * pm10_rel_vol['(NH4)2SO4'][month_idx] + \
+                interp_f_RH_i['Ammonium nitrate'] * pm10_rel_vol['NH4NO3'][month_idx] + \
+                interp_f_RH_i['Aged fossil-fuel OC'] * pm10_rel_vol['CORG'][month_idx] + \
+                interp_f_RH_i['Soot'] * pm10_rel_vol['CBLK'][month_idx] + \
+                interp_f_RH_i['Generic NaCl'] * pm10_rel_vol['NaCl'][month_idx]
 
-    # save f(RH)
+
+    # save f(RH) once all radii have been looped through
     if saveFRH == True:
-        np.savetxt(f_RHdir +  file_name + '_ext_f(RH)_' + band_lam_range + '.csv',
-                   np.transpose(np.vstack((RH, f_RH['MURK']))), delimiter=',', header='RH,f_RH')
+
+        save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_nm_str)
+
+
+
+
+
+
+
+
+
+
+
 
     # min and max possible ranges in f(RH)
     # https://books.google.co.uk/books?id=OnmyzXfS6ggC&pg=PA59&lpg=PA59&dq=mass+closure+aerosol+london&source=bl&ots=Nd9L-GBPp_&sig=0KzD_
     # USvtga8-c4fv674hPKnA1E&hl=en&sa=X&ved=0ahUKEwiDwqPeqLHUAhXIKcAKHSmsBW8Q6AEIVzAH#v=onepage&q=mass%20closure%20aerosol%20london&f=false
     # U is capitalised...
-
-    # Need something to represent Iron-rich Dusts (mineral matter?)
-    #f_RH_Birmingham = (0.093 * np.array(f_RH['Generic NaCl'])) + (0.08 * np.array(f_RH['Soot'])) + \
-    #(0.2757 * np.array(f_RH['Ammonium Sulphate'])) + (0.2757 * np.array(f_RH['Ammonium nitrate'])) + (0.2757 * np.array(f_RH['Aged fossil-fuel OC']))
-
-    # How much bigger is Birmingham to MURK?
-    # f_RH['Birmingham'] / np.array(f_RH['MURK'])
 
     # ---------------------------------------------------
     # Plotting
