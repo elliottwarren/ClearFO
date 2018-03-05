@@ -240,10 +240,10 @@ if __name__ == '__main__':
     # Setup
     # ------------------------------------------
     # site information
-    site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
-                'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
-    # site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
-    #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
+    # site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
+    #             'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
+    site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
+                'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
     # site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
     #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
 
@@ -436,7 +436,7 @@ if __name__ == '__main__':
 
             # find where rh_val is
             rad_idx = np.where(radii_range_micron == rad_val)[0][0]
-            print rad_idx
+            # print rad_idx
 
             # ratio of f(RH) for this month / average across all months
             f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
