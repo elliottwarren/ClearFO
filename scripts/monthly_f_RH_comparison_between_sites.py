@@ -69,7 +69,7 @@ if __name__ == '__main__':
     # Read, Process and save f(RH)
     # ---------------------------------------------------
 
-    data = {}
+    f_RH_data = {}
 
     # read in f(RH) for each site
     for site in ['NK', 'Ch', 'Ha']:
@@ -80,52 +80,19 @@ if __name__ == '__main__':
 
         rawdata = eu.netCDF_read(path)
 
+        f_RH_data[site] = rawdata['f(RH) MURK']
 
+        if site == 'NK':
+            months = rawdata['months']
+            RH = rawdata['Relative Humidity']
+            radii_range_nm = rawdata['radii_range_nm']
 
-
+    radii_range_micron = radii_range_nm*1e-3
 
     # ---------------------------------------------------
     # Plotting
     # ---------------------------------------------------
 
-    # 1. quick pcolor plot - seems like f(RH) has a low sensitivity to radius, above ~0.3 microns
-    for month_idx in range(12):
-        fig = plt.figure(figsize=(6, 4))
-        plt.pcolor(radii_range_micron, RH_int * 100.0, np.transpose(f_RH['MURK'][month_idx, :, :]), vmin=1, vmax=13)
-        plt.colorbar()
-        ax = plt.gca()
-        ax.set_xscale('log')
-        plt.xlabel('radius [microns]')
-        plt.ylabel('RH [%]')
-        monthstr = dt.datetime(1900, month_idx+1, 1).strftime('%B')
-        plt.suptitle(site_ins['site_short'] + ': f(RH) MURK' + ' - ' + monthstr)
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        plt.savefig(savedir + site_ins['site_short'] + '_f(RH)_MURK_'+str(month_idx+1))
-        plt.close(fig)
-
-
-    # 2. plot f(RH) for MURK, with respect to size, for a few RHs
-    month_idx = 6
-    fig = plt.figure(figsize=(6, 4))
-
-    # loop through an arbitrary list of RH values to plot
-    for rh_val in [40, 60, 80, 95]:
-
-        # find where rh_val is
-        rh_idx = np.where(RH_int*100 == rh_val)
-        print rh_idx
-
-        if rh_val >= 90:
-            ls = '--'
-        else:
-            ls = '-'
-        plt.plot(radii_range_micron, np.squeeze(f_RH['MURK'][month_idx, :, rh_idx]), label=str(RH_int[rh_val]), linestyle=ls)
-        plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
-
-    plt.xlabel('radius [microns]')
-    plt.ylabel('f(RH)')
-    plt.legend()
-    plt.savefig(savedir + site_ins['site_short'] + '_f(RH)_MURK_'+str(month_idx+1))
 
 
     # 3. plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
@@ -134,33 +101,37 @@ if __name__ == '__main__':
 
         date_i = dt.datetime(1900, month_idx+1, 1).strftime('%b')
 
-        fig = plt.figure(figsize=(6, 4))
-
         # find 0.11 ahead of time
-        rad_0p11_idx = np.where(radii_range_micron == 0.11)[0][0]
+        # rad_0p11_idx = np.where(radii_range_micron == 0.11)[0][0]
 
         # loop through an arbitrary list of RH values to plot
-        for rad_val in [0.07, 0.11, 0.14, 0.4, 1.0, 3.0]:
+        for rad_val in [0.7, 0.11, 3.0]:
+
+            fig = plt.figure(figsize=(6, 4))
 
             # find where rh_val is
-            rad_idx = np.where(radii_range_micron == rad_val)[0][0]
+            _, rad_idx, _ = eu.nearest(radii_range_micron, rad_val)
             # print rad_idx
 
-            # ratio of f(RH) for this month / average across all months
-            f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
-                             / f_RH['MURK'][month_idx, rad_0p11_idx, :]
+            for site in f_RH_data.iterkeys():
 
-            plt.plot(RH_int*100.0, f_RH_plot_data, label=str(radii_range_micron[rad_idx]),
-                     linestyle='-')
+
+                # data to plot
+                f_RH_plot_data = np.squeeze(f_RH_data['Ch'][month_idx, rad_idx, :]) \
+                                 / f_RH_data[site][month_idx, rad_idx, :]
+
+                plt.plot(RH*100.0, f_RH_plot_data, label=site,
+                         linestyle='-')
             # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
 
-        plt.xlabel('RH [%]')
-        plt.ylabel('f(RH)')
-        plt.ylim([0.0, 2.0])
-        plt.legend(loc='top left')
-        plt.suptitle(date_i)
-        plt.savefig(savedir + 'wrt_radii_radii_ratio/' + 'wrt_radii_ratio' + site_ins['site_short'] + '_f(RH)_MURK_'+str(month_idx+1))
-        plt.close(fig)
+            plt.xlabel('RH [%]')
+            plt.ylabel('f(RH)')
+            plt.ylim([0.0, 2.0])
+            plt.legend(loc='top left')
+            plt.suptitle(date_i + ' radii = ' + str(rad_val))
+            plt.savefig(savedir + 'compare/' + 'wrt_radii_ratio' + site + '_f(RH)_MURK_'+str(month_idx+1) + \
+                        '_radii_'+str(rad_val)+'.png')
+            plt.close(fig)
 
     # 4. RATIO plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
     # wrt_radii_monthly_ratio
