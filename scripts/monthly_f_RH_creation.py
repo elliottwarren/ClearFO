@@ -10,9 +10,12 @@ from scipy.optimize import curve_fit
 from scipy import interpolate
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+from matplotlib import cm
 import pickle
 from netCDF4 import Dataset
 import datetime as dt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Reading
 
@@ -234,16 +237,38 @@ def save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_
 
     return
 
+# plotting
+
+def create_colours(intervals):
+
+    """
+    create a simple range of colours (RGB)
+    :param intervals: number of intervals colour range will have
+    :return: colours: the colour range
+    """
+
+    r = 0.2
+    g = 0.5
+
+    step = 1.0 / intervals
+
+    b_colours = np.arange(0.0, 1.0, step)
+    g_colours = np.arange(1.0, 0.0, -step)
+
+    colours = [[r, g_colours[i], b_colours[i]] for i in range(len(b_colours))]
+
+    return colours
+
 if __name__ == '__main__':
 
     # ------------------------------------------
     # Setup
     # ------------------------------------------
     # site information
-    # site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
-    #             'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
-    site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
-                'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
+    site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
+                'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
+    # site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
+    #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
     # site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
     #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
 
@@ -283,6 +308,12 @@ if __name__ == '__main__':
     # Q type to use in calculating f(RH)
     Q_type = 'extinction'
     print 'Q_type = ' + Q_type
+
+    # range of colours (0.1 % resolution)
+    res = 1000
+    cmap = cm.jet
+    colours = cm.jet(np.linspace(0, 1, res))
+    norm = mpl.colors.Normalize(vmin=0, vmax=100)
 
     # ---------------------------------------------------
     # Read, Process and save f(RH)
@@ -396,30 +427,6 @@ if __name__ == '__main__':
         plt.close(fig)
 
 
-    # 2. plot f(RH) for MURK, with respect to size, for a few RHs
-    month_idx = 6
-    fig = plt.figure(figsize=(6, 4))
-
-    # loop through an arbitrary list of RH values to plot
-    for rh_val in [40, 60, 80, 95]:
-
-        # find where rh_val is
-        rh_idx = np.where(RH_int*100 == rh_val)
-        print rh_idx
-
-        if rh_val >= 90:
-            ls = '--'
-        else:
-            ls = '-'
-        plt.plot(radii_range_micron, np.squeeze(f_RH['MURK'][month_idx, :, rh_idx]), label=str(RH_int[rh_val]), linestyle=ls)
-        plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
-
-    plt.xlabel('radius [microns]')
-    plt.ylabel('f(RH)')
-    plt.legend()
-    plt.savefig(savedir + site_ins['site_short'] + '_f(RH)_MURK_'+str(month_idx+1))
-
-
     # 3. plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
     # wrt_radii_radii_ratio
     for month_idx in range(12):
@@ -496,32 +503,69 @@ if __name__ == '__main__':
         plt.savefig(savedir + 'wrt_radii_monthly_ratio/' + 'wrt_radii_ratio_' + site_ins['site_short'] + '_f(RH)_MURK_'+'%.2f' % rad_val+'.png')
         plt.close(fig)
 
-    # # plot the data at the end so it is all neat and together
-    # fig = plt.figure(figsize=(6, 4))
-    #
-    # for key, value in data.iteritems():
-    #
-    #     plt.plot(RH*100, f_RH[key], label=key, linestyle='-')
-    #
-    # # plt.plot(value[:, 0], f_RH['average with Aitken Sulphate'], label='average with Aitken Sulphate', linestyle='-')
-    #
-    # # plot the MURK one
-    # # plt.plot(value[:, 0], f_RH['average'], label='average without Aitken Sulphate', color='black')
-    # plt.plot(RH*100, f_RH['MURK'], label='MURK', color='black')
-    #
-    # # plot soot as a constant until I get f(RH) for it
-    # plt.plot([0.0, 100.0], [1.0, 1.0], label='Soot')
-    #
-    # plt.legend(fontsize=10, loc='best')
-    # plt.tick_params(axis='both', labelsize=11)
-    # plt.xlabel('RH [%]', labelpad=0, fontsize=11)
-    # # plt.ylabel(Q_type + ' f(RH)')
-    # plt.ylabel(r'$f_{ext,rh}$', fontsize=11)
-    # plt.ylim([0.0, 8.0])
-    # plt.xlim([0.0, 100.0])
-    # # plt.title(file_name + ': ' + band_lam_range + ' band')
-    #
-    # plt.tight_layout() # moved tight_layout above... was originally after the save (06/04/17)
-    # plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_all_' + band_lam_range + '_salt8.0.png')
+    # 5. RATIO plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
+    # wrt_radii_monthly_ratio
+    # for rad_val in [0.07, 0.11, 0.14, 0.4, 1.0, 3.0]:
+    for rad_val in [0.11]:
+
+        # for aer_i, aer_data in pm10_rel_vol.iteritems():
+
+        aer_i = 'CBLK'
+        aer_data = pm10_rel_vol['CBLK']
+
+        fig = plt.figure(figsize=(6, 4))
+        ax = plt.gca()
+
+        # loop through an arbitrary list of RH values to plot
+
+        # find where rh_val is
+        rad_idx = np.where(radii_range_micron == rad_val)[0][0]
+        print rad_idx
+
+        for month_idx, month_i in enumerate(range(1, 13)):
+
+            # colour the month - find where along the scale, the current % species should lie
+            #   res is the resolution of the colour range, so (*res) finds what colour along that it should have
+            #   NOTE: 0.5 is rounded down using np.round()
+            colour_idx = int(np.round(pm10_rel_vol[aer_i][month_idx] * res))
+
+
+            # # get colour and linestyle for month
+            # for key, data in month_colours.iteritems():
+            #     if month_i in data:
+            #         colour_i = key
+            #
+            # for key, data in month_ls.iteritems():
+            #     if month_i in data:
+            #         ls = key
+
+            # month as 3 letter str
+            date_i = dt.datetime(1900, month_i, 1).strftime('%b')
+
+
+            # ratio of f(RH) for this month / average across all months
+            f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
+                             / np.mean(f_RH['MURK'][:, rad_idx, :], axis=0)
+
+            handle = plt.plot(RH_int*100.0, f_RH_plot_data, label=date_i,
+                     linestyle='-', color=colours[colour_idx, :])
+            # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
+
+        plt.xlabel('RH [%]')
+        plt.ylabel('f(RH, month_i)/f(RH, average(months)')
+        plt.ylim([0.8, 1.5])
+        plt.legend(loc='top left', ncol=2)
+
+        # plot colourbar
+        divider = make_axes_locatable(ax)
+        # cax = divider.append_axes("right", size="5%", pad=0.05)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = mpl.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
+        cbar.set_label(r'$species\/[\%]$', labelpad=-38, y=1.075, rotation=0)
+
+        plt.suptitle('radii: '+ str(rad_val) + ' [microns]')
+        plt.savefig(savedir + 'species_colour/' + 'ratio_' + site_ins['site_short'] + '_f(RH)_MURK_colour_by_'+aer_i+'.png')
+        plt.close(fig)
+
 
     print 'END PROGRRAM'
