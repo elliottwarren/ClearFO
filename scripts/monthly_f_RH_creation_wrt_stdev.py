@@ -240,10 +240,10 @@ if __name__ == '__main__':
     # Setup
     # ------------------------------------------
     # site information
-    # site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
-    #             'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
-    site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
-                'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
+    site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
+                'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
+    # site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
+    #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
     # site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
     #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
 
@@ -296,10 +296,8 @@ if __name__ == '__main__':
         pickle_load_in = pickle.load(handle)
     pm10_rel_vol = pickle_load_in['pm10_rel_vol']
 
-    # range of radii to iterate over
-    radii_range_m = np.arange(0.005e-06, 3.685e-6 + 0.005e-06, 0.005e-06)
-    radii_range_micron = np.arange(0.005, 3.685 + 0.005, 0.005)
-    radii_range_nm = np.arange(5, 3685 + 5, 5)
+    # range of st dev to iterate over
+    stdev_range = np.linspace(1.1, 2.0, 10)# np.arange(1.1, 2.1, 0.1)
 
     # RH to interpolate to
     RH_int = np.arange(0, 1.01, 0.01)
@@ -308,23 +306,23 @@ if __name__ == '__main__':
     #   MURK data will be in a 3D array [month, size, RH]
     #   all other speices will be 2D [size, RH] as they wont vary each month
     f_RH = {}
-    f_RH['MURK'] = np.empty((12, len(radii_range_nm), 101))
+    f_RH['MURK'] = np.empty((12, len(stdev_range), 101))
     f_RH['MURK'][:] = np.nan
     for species_i in aer_particles:
-        f_RH[species_i] = np.empty((len(radii_range_nm), 101))
+        f_RH[species_i] = np.empty((len(stdev_range), 101))
         f_RH[species_i][:] = np.nan
 
 
-    for radius_idx, radius_nm_i in enumerate(radii_range_nm):
+    for stdev_idx, stdev_i in enumerate(stdev_range):
 
-        print radius_idx
+        print stdev_i
 
         # format of radius used in the filename
         #   trying to use m or microns leads to rounding errors when making the string...
-        radius_filestr = '0.%09d' % radius_nm_i
+        stdev_i_filestr = '%3.1f' % stdev_i
 
         # create filename
-        filename = 'sp_885-925_r'+radius_filestr+'_stdev1.6_num4.461e9'
+        filename = 'sp_885-925_r1.1e-7_stdev'+stdev_i_filestr+'_num4.461e9'
         file_path = specdir + filename
 
         # read in the spectral band information
@@ -352,17 +350,17 @@ if __name__ == '__main__':
 
         # soot is always the same (fixed at 1)
         interp_f_RH_i['Soot'] = np.repeat(1.0, 101)
-        f_RH['CBLK'][radius_idx, :] = interp_f_RH_i['Soot']
+        f_RH['CBLK'][stdev_idx, :] = interp_f_RH_i['Soot']
 
         # all species excluding soot
         for species_i, chem_i in aer_particles_chem.iteritems():
             f = interp1d(RH, f_RH_i[species_i], kind='linear')
             interp_f_RH_i[species_i] = f(RH_int)
-            f_RH[chem_i][radius_idx, :] = interp_f_RH_i[species_i]
+            f_RH[chem_i][stdev_idx, :] = interp_f_RH_i[species_i]
 
         # make f(RH) for murk from the interpolated f(RH)
         for month_idx in range(12):
-            f_RH['MURK'][month_idx, radius_idx, :] = \
+            f_RH['MURK'][month_idx, stdev_idx, :] = \
                 (interp_f_RH_i['Ammonium Sulphate'] * pm10_rel_vol['(NH4)2SO4'][month_idx]) + \
                 (interp_f_RH_i['Ammonium nitrate'] * pm10_rel_vol['NH4NO3'][month_idx]) + \
                 (interp_f_RH_i['Aged fossil-fuel OC'] * pm10_rel_vol['CORG'][month_idx]) + \
@@ -370,54 +368,14 @@ if __name__ == '__main__':
                 (interp_f_RH_i['Generic NaCl'] * pm10_rel_vol['NaCl'][month_idx])
 
 
-    # save f(RH) once all radii have been looped through
-    if saveFRH == True:
-
-        save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_nm_str)
+    # # save f(RH) once all radii have been looped through
+    # if saveFRH == True:
+    #     save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_nm_str)
 
 
     # ---------------------------------------------------
     # Plotting
     # ---------------------------------------------------
-
-    # 1. quick pcolor plot - seems like f(RH) has a low sensitivity to radius, above ~0.3 microns
-    for month_idx in range(12):
-        fig = plt.figure(figsize=(6, 4))
-        plt.pcolor(radii_range_micron, RH_int * 100.0, np.transpose(f_RH['MURK'][month_idx, :, :]), vmin=1, vmax=13)
-        plt.colorbar()
-        ax = plt.gca()
-        ax.set_xscale('log')
-        plt.xlabel('radius [microns]')
-        plt.ylabel('RH [%]')
-        monthstr = dt.datetime(1900, month_idx+1, 1).strftime('%B')
-        plt.suptitle(site_ins['site_short'] + ': f(RH) MURK' + ' - ' + monthstr)
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-        plt.savefig(savedir + site_ins['site_short'] + '_f(RH)_MURK_'+str(month_idx+1))
-        plt.close(fig)
-
-
-    # 2. plot f(RH) for MURK, with respect to size, for a few RHs
-    month_idx = 6
-    fig = plt.figure(figsize=(6, 4))
-
-    # loop through an arbitrary list of RH values to plot
-    for rh_val in [40, 60, 80, 95]:
-
-        # find where rh_val is
-        rh_idx = np.where(RH_int*100 == rh_val)
-        print rh_idx
-
-        if rh_val >= 90:
-            ls = '--'
-        else:
-            ls = '-'
-        plt.plot(radii_range_micron, np.squeeze(f_RH['MURK'][month_idx, :, rh_idx]), label=str(RH_int[rh_val]), linestyle=ls)
-        plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
-
-    plt.xlabel('radius [microns]')
-    plt.ylabel('f(RH)')
-    plt.legend()
-    plt.savefig(savedir + site_ins['site_short'] + '_f(RH)_MURK_'+str(month_idx+1))
 
 
     # 3. plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
@@ -428,100 +386,74 @@ if __name__ == '__main__':
 
         fig = plt.figure(figsize=(6, 4))
 
-        # find 0.11 ahead of time
-        rad_0p11_idx = np.where(radii_range_micron == 0.11)[0][0]
+        # find 1.6 (the original) ahead of time
+        stdev_1p6_idx = np.where(stdev_range == 1.6)[0][0]
 
         # loop through an arbitrary list of RH values to plot
-        for rad_val in [0.07, 0.11, 0.14, 0.4, 1.0, 3.0]:
+        for stdev_idx, stdev_val in enumerate(stdev_range):
 
             # find where rh_val is
-            rad_idx = np.where(radii_range_micron == rad_val)[0][0]
+            rad_idx = np.where(stdev_range == stdev_val)[0][0]
             # print rad_idx
 
-            # ratio of f(RH) for this month / average across all months
-            f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
-                             / f_RH['MURK'][month_idx, rad_0p11_idx, :]
+            # ratio of f(RH) for this stdev / 1.6 stdev
+            f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, stdev_idx, :]) \
+                             / f_RH['MURK'][month_idx, stdev_1p6_idx, :]
 
-            plt.plot(RH_int*100.0, f_RH_plot_data, label=str(radii_range_micron[rad_idx]),
+            plt.plot(RH_int*100.0, f_RH_plot_data, label=str(stdev_val),
                      linestyle='-')
             # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
 
         plt.xlabel('RH [%]')
-        plt.ylabel('f(RH)')
-        plt.ylim([0.0, 2.0])
-        plt.legend(loc='top left')
+        plt.ylabel('f(RH, stdev_i)/f(RH, stdev = 1.6)')
+        plt.ylim([0.0, 3.0])
+        plt.legend(loc='upper left')
         plt.suptitle(date_i)
-        plt.savefig(savedir + 'wrt_radii_radii_ratio/' + 'wrt_radii_ratio' + site_ins['site_short'] + '_f(RH)_MURK_'+str(month_idx+1))
+        plt.savefig(savedir + 'wrt_stdev_ratio/' + 'stdev_ratio_' + site_ins['site_short'] + '_f(RH)_MURK_'+str(month_idx+1))
         plt.close(fig)
 
-    # 4. RATIO plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
-    # wrt_radii_monthly_ratio
-    for rad_val in [0.07, 0.11, 0.14, 0.4, 1.0, 3.0]:
-        fig = plt.figure(figsize=(6, 4))
-
-        # loop through an arbitrary list of RH values to plot
-
-        # find where rh_val is
-        rad_idx = np.where(radii_range_micron == rad_val)[0][0]
-        print rad_idx
-
-        for month_idx, month_i in enumerate(range(1, 13)):
-
-            # get colour and linestyle for month
-            for key, data in month_colours.iteritems():
-                if month_i in data:
-                    colour_i = key
-
-            for key, data in month_ls.iteritems():
-                if month_i in data:
-                    ls = key
-
-            # month as 3 letter str
-            date_i = dt.datetime(1900, month_i, 1).strftime('%b')
-
-
-            # ratio of f(RH) for this month / average across all months
-            f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
-                             / np.mean(f_RH['MURK'][:, rad_idx, :], axis=0)
-
-            plt.plot(RH_int*100.0, f_RH_plot_data, label=date_i,
-                     linestyle=ls, color=colour_i)
-            # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
-
-        plt.xlabel('RH [%]')
-        plt.ylabel('f(RH)')
-        plt.ylim([0.8, 1.5])
-        plt.legend(loc='top left', ncol=2)
-        plt.suptitle('radii: '+ str(rad_val) + ' [microns]')
-        plt.savefig(savedir + 'wrt_radii_monthly_ratio/' + 'wrt_radii_ratio_' + site_ins['site_short'] + '_f(RH)_MURK_'+'%.2f' % rad_val+'.png')
-        plt.close(fig)
-
-    # # plot the data at the end so it is all neat and together
-    # fig = plt.figure(figsize=(6, 4))
+    # # 4. RATIO plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
+    # # wrt_radii_monthly_ratio
+    # for rad_val in [0.07, 0.11, 0.14, 0.4, 1.0, 3.0]:
+    #     fig = plt.figure(figsize=(6, 4))
     #
-    # for key, value in data.iteritems():
+    #     # loop through an arbitrary list of RH values to plot
     #
-    #     plt.plot(RH*100, f_RH[key], label=key, linestyle='-')
+    #     # find where rh_val is
+    #     rad_idx = np.where(radii_range_micron == rad_val)[0][0]
+    #     print rad_idx
     #
-    # # plt.plot(value[:, 0], f_RH['average with Aitken Sulphate'], label='average with Aitken Sulphate', linestyle='-')
+    #     for month_idx, month_i in enumerate(range(1, 13)):
     #
-    # # plot the MURK one
-    # # plt.plot(value[:, 0], f_RH['average'], label='average without Aitken Sulphate', color='black')
-    # plt.plot(RH*100, f_RH['MURK'], label='MURK', color='black')
+    #         # get colour and linestyle for month
+    #         for key, data in month_colours.iteritems():
+    #             if month_i in data:
+    #                 colour_i = key
     #
-    # # plot soot as a constant until I get f(RH) for it
-    # plt.plot([0.0, 100.0], [1.0, 1.0], label='Soot')
+    #         for key, data in month_ls.iteritems():
+    #             if month_i in data:
+    #                 ls = key
     #
-    # plt.legend(fontsize=10, loc='best')
-    # plt.tick_params(axis='both', labelsize=11)
-    # plt.xlabel('RH [%]', labelpad=0, fontsize=11)
-    # # plt.ylabel(Q_type + ' f(RH)')
-    # plt.ylabel(r'$f_{ext,rh}$', fontsize=11)
-    # plt.ylim([0.0, 8.0])
-    # plt.xlim([0.0, 100.0])
-    # # plt.title(file_name + ': ' + band_lam_range + ' band')
+    #         # month as 3 letter str
+    #         date_i = dt.datetime(1900, month_i, 1).strftime('%b')
     #
-    # plt.tight_layout() # moved tight_layout above... was originally after the save (06/04/17)
-    # plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_all_' + band_lam_range + '_salt8.0.png')
+    #
+    #         # ratio of f(RH) for this month / average across all months
+    #         f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
+    #                          / np.mean(f_RH['MURK'][:, rad_idx, :], axis=0)
+    #
+    #         plt.plot(RH_int*100.0, f_RH_plot_data, label=date_i,
+    #                  linestyle=ls, color=colour_i)
+    #         # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
+    #
+    #     plt.xlabel('RH [%]')
+    #     plt.ylabel('f(RH)')
+    #     plt.ylim([0.8, 1.5])
+    #     plt.legend(loc='top left', ncol=2)
+    #     plt.suptitle('radii: '+ str(rad_val) + ' [microns]')
+    #     plt.savefig(savedir + 'wrt_radii_monthly_ratio/' + 'wrt_radii_ratio_' + site_ins['site_short'] + '_f(RH)_MURK_'+'%.2f' % rad_val+'.png')
+    #     plt.close(fig)
+
+
 
     print 'END PROGRRAM'
