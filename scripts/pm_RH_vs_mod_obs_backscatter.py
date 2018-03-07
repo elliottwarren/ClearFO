@@ -179,6 +179,77 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
 
     return
 
+def plot_back_point_ratio(stats_site, savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type, c_type='hr', extra=''):
+
+    """
+    Plot the rh or aer difference vs backscatter diff
+    :return:
+    """
+
+    # variable plotting against backscatter point diff
+    if var_type == 'aerosol':
+        var_ratio = stats_site['aer_diff']
+    elif var_type == 'RH':
+        var_ratio = stats_site['rh_diff']
+
+    # backscatter point difference
+    back_point_diff = stats_site['back_diff_norm']
+    # back_point_diff = stats_site['back_diff_log']
+
+    fig = plt.figure(figsize=(6, 3.5))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+
+    # variable specific labels and names
+    if var_type == 'RH':
+        xlab = r'$Difference \/\mathrm{(RH_{ukv} - RH_{obs})}$'
+
+    elif var_type == 'aerosol':
+        xlab = r'$Difference \/\mathrm{(m_{MURK} - PM_{10})}$'
+
+    # define the colormap
+    cmap, norm = discrete_colour_map(40, 100, 13)
+
+    # plot data
+    scat = plt.scatter(var_ratio, back_point_diff, c=stats_site[c_type], s=6, vmin=40.0, vmax=100.0, cmap=cmap, norm=norm)
+
+    # add 0 lines
+    ax.axhline(linestyle='--', color='grey', alpha=0.5)
+    ax.axvline(linestyle='--', color='grey', alpha=0.5)
+
+    # ax.set_ylim([-5e-06, 5e-06])
+
+    # add colourbar on the side
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = plt.colorbar(scat, cax=cax, norm=norm)
+    cbar.set_label(r'$RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
+
+
+    ax.set_xlabel(xlab)
+    ax.set_ylim([-1e-5, 1e-5])
+    # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
+    ax.set_ylabel(r'$Difference \/\mathrm{(\beta_m - \beta_o)}$')
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+
+    # Fake a ScalarMappable so I can display a colormap
+    # cmap, norm = mcolors.from_levels_and_colors(range(24 + 1), rgb)
+    # sm = matplotlib.cm.ScalarMappable(cmap=cmap, norm=norm)
+    # sm.set_array([])
+    # fig.colorbar(sm)
+    # plt.colorbar()
+
+    fig.suptitle(ceil + '; n = ' + str(sampleSize) + '; r = ' + '{:1.2f}'.format(corr['r']) +
+                 '; p = ' + '%1.2f' % corr['p'])
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.90)
+    plt.savefig(savedir + 'point_diff/' +
+                model_type + '_' + var_type + '_diff_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '_c' + c_type +
+                '_' + extra + '.png')  # filename
+
+    plt.close(fig)
+
+    return
+
 def plot_back_point_diff_6hr(var_diff, back_point_diff, savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type):
 
     """
@@ -499,15 +570,26 @@ def main():
 
 
 
-    # # quick remove RH > 80
-    # val = 80.0
-    # idx_lt = np.where(np.array(statistics[site_id]['rh_mod']) <= val)
-    #
-    # for key in statistics[site_id].iterkeys():
-    #     if len(statistics[site_id][key]) != 0:
-    #         for i in idx_lt[0]:
-    #             statistics[site_id][key][i] = np.nan
-    # sampleSize -= len(idx_lt[0])
+
+    # quick remove RH > x
+    for val in np.arange(40, 110, 10):
+
+        stats_copy = deepcopy(statistics[site_id])
+
+        idx_lt = np.where(np.array(stats_copy['rh_mod']) >= val)
+
+        for key in stats_copy.iterkeys():
+            if len(stats_copy[key]) != 0:
+                for i in idx_lt[0]:
+                    stats_copy[key][i] = np.nan
+        sampleSize -= len(idx_lt[0])
+        r, p = spearmanr(stats_copy['aer_diff'], stats_copy['back_diff_log'],
+                         nan_policy='omit')
+
+        print 'val =' + str(val)
+        print r
+        print p
+        print ''
 
 
     # do correlation
@@ -568,8 +650,16 @@ def main():
         # MAE['n'] += [1 if type(m_bin_idx)...
 
     # plot MAE
+    # work around needed for end box as it only has two values.
     fig, ax = plt.subplots(1, 1, figsize=(6, 3.5))
-    ax.boxplot(MAE['AE'], widths=bin, positions=pos, whis=[5, 95], sym='x')
+    plt.boxplot(MAE['AE'][:-1], widths=bin, positions=pos[:-1], whis=[5, 95], sym='x', hold=True)
+    if len(MAE['AE'][-1]) == 2:
+        plt.scatter([pos[-1],pos[-1]], MAE['AE'][-1], marker='x', color='black')
+    else:
+        raise ValueError('End box n != 2, make sure data is being plotted correctly \n'
+                         'a specific work around is currently implemented!')
+    plt.scatter(pos[:-1], MAE['MAE'][:-1], marker='o', color='blue', edgecolor='blue')
+
 
     # prettify
     ax.set_xlim([bin_start, bin_end])
@@ -578,7 +668,7 @@ def main():
     ax.set_xlabel(r'$Difference \/\mathrm{(m_{MURK} - PM_{10})}$')
     ax.set_ylabel(r'$Absolute \/\/Error\/\/\/ \mathrm{(|\beta_m - \beta_o|)}$')
     ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-    ax.set_ylim([0.0, 5.5e-06])
+    ax.set_ylim([0.0, 6.0e-06])
 
     # add sample size at the top of plot for each box and whiskers
     # pos_t = np.arange(numBoxes) + 1
@@ -586,7 +676,7 @@ def main():
     weights = ['bold', 'semibold']
     for tick, label in zip(range(len(pos)), ax.get_xticklabels()):
         k = tick % 2
-        ax.text(pos[tick], 5.5e-06 - (5.5e-06 * 0.05), upperLabels[tick],
+        ax.text(pos[tick], 6.0e-06 - (6.0e-06 * 0.05), upperLabels[tick],
                  horizontalalignment='center', size='x-small')
 
     plt.subplots_adjust(left=0.1)
