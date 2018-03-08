@@ -16,6 +16,7 @@ import pickle
 from netCDF4 import Dataset
 import datetime as dt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import ellUtils as eu
 
 # Reading
 
@@ -265,12 +266,12 @@ if __name__ == '__main__':
     # Setup
     # ------------------------------------------
     # site information
-    site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
-                'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
+    # site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
+    #             'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
     # site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
     #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
-    # site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
-    #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
+    site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
+                'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
 
     ceil_lambda_nm_str = str(site_ins['ceil_lambda'] * 1e9) + 'nm'
 
@@ -310,10 +311,10 @@ if __name__ == '__main__':
     print 'Q_type = ' + Q_type
 
     # range of colours (0.1 % resolution)
-    res = 1000
-    cmap = cm.jet
-    colours = cm.jet(np.linspace(0, 1, res))
-    norm = mpl.colors.Normalize(vmin=0, vmax=100)
+    # res = 1000
+    cmap = cm.winter
+    # colours = cm.jet(np.linspace(0, 1, res))
+    # norm = mpl.colors.Normalize(vmin=0, vmax=100)
 
     # ---------------------------------------------------
     # Read, Process and save f(RH)
@@ -508,64 +509,76 @@ if __name__ == '__main__':
     # for rad_val in [0.07, 0.11, 0.14, 0.4, 1.0, 3.0]:
     for rad_val in [0.11]:
 
-        # for aer_i, aer_data in pm10_rel_vol.iteritems():
+        for aer_i, aer_data in pm10_rel_vol.iteritems():
 
-        aer_i = 'CBLK'
-        aer_data = pm10_rel_vol['CBLK']
+            # aer_i = 'CBLK'
+            # aer_data = pm10_rel_vol['CBLK']
 
-        fig = plt.figure(figsize=(6, 4))
-        ax = plt.gca()
+            # set up how to colour the lines for this aerosol
+            #   what will the range be, given how variable the aerosol is across the months
+            max_aer_val = aer_data.max()
+            min_aer_val = aer_data.min()
+            res = 1000
+            # colours = cm.jet(np.linspace(0, 1, res))
+            # c_range = np.linspace(0, max_aer_val, res)
+            colours = cm.coolwarm(np.linspace(0, 1, res))
+            c_range = np.linspace(min_aer_val, max_aer_val, res)
+            norm = mpl.colors.Normalize(vmin=min_aer_val, vmax=max_aer_val)
 
-        # loop through an arbitrary list of RH values to plot
+            fig = plt.figure(figsize=(6, 4))
+            ax = plt.gca()
 
-        # find where rh_val is
-        rad_idx = np.where(radii_range_micron == rad_val)[0][0]
-        print rad_idx
+            # loop through an arbitrary list of RH values to plot
 
-        for month_idx, month_i in enumerate(range(1, 13)):
+            # find where rh_val is
+            rad_idx = np.where(radii_range_micron == rad_val)[0][0]
+            print rad_idx
 
-            # colour the month - find where along the scale, the current % species should lie
-            #   res is the resolution of the colour range, so (*res) finds what colour along that it should have
-            #   NOTE: 0.5 is rounded down using np.round()
-            colour_idx = int(np.round(pm10_rel_vol[aer_i][month_idx] * res))
+            for month_idx, month_i in enumerate(range(1, 13)):
+
+                # colour the month - find where along the scale, the current % species should lie
+                #   res is the resolution of the colour range, so (*res) finds what colour along that it should have
+                #   NOTE: 0.5 is rounded down using np.round()
+                # colour_idx = int(np.round(pm10_rel_vol[aer_i][month_idx] * res))
+                _, colour_idx, _ = eu.nearest(c_range, pm10_rel_vol[aer_i][month_idx])
+                print colour_idx
+
+                # # get colour and linestyle for month
+                # for key, data in month_colours.iteritems():
+                #     if month_i in data:
+                #         colour_i = key
+                #
+                # for key, data in month_ls.iteritems():
+                #     if month_i in data:
+                #         ls = key
+
+                # month as 3 letter str
+                date_i = dt.datetime(1900, month_i, 1).strftime('%b')
 
 
-            # # get colour and linestyle for month
-            # for key, data in month_colours.iteritems():
-            #     if month_i in data:
-            #         colour_i = key
-            #
-            # for key, data in month_ls.iteritems():
-            #     if month_i in data:
-            #         ls = key
+                # ratio of f(RH) for this month / average across all months
+                f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
+                                 / np.mean(f_RH['MURK'][:, rad_idx, :], axis=0)
 
-            # month as 3 letter str
-            date_i = dt.datetime(1900, month_i, 1).strftime('%b')
+                handle = plt.plot(RH_int*100.0, f_RH_plot_data, label=date_i,
+                         linestyle='-', color=colours[colour_idx, :])
+                # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
 
+            plt.xlabel('RH [%]')
+            plt.ylabel('f(RH, month_i)/f(RH, average(months)')
+            plt.ylim([0.8, 1.5])
+            plt.legend(loc='top left', ncol=2)
 
-            # ratio of f(RH) for this month / average across all months
-            f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
-                             / np.mean(f_RH['MURK'][:, rad_idx, :], axis=0)
+            # plot colourbar
+            divider = make_axes_locatable(ax)
+            # cax = divider.append_axes("right", size="5%", pad=0.05)
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            cbar = mpl.colorbar.ColorbarBase(cax, cmap=cm.coolwarm, norm=norm)
+            cbar.set_label(r'$species\/[\%]$', labelpad=-38, y=1.075, rotation=0)
 
-            handle = plt.plot(RH_int*100.0, f_RH_plot_data, label=date_i,
-                     linestyle='-', color=colours[colour_idx, :])
-            # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
-
-        plt.xlabel('RH [%]')
-        plt.ylabel('f(RH, month_i)/f(RH, average(months)')
-        plt.ylim([0.8, 1.5])
-        plt.legend(loc='top left', ncol=2)
-
-        # plot colourbar
-        divider = make_axes_locatable(ax)
-        # cax = divider.append_axes("right", size="5%", pad=0.05)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        cbar = mpl.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
-        cbar.set_label(r'$species\/[\%]$', labelpad=-38, y=1.075, rotation=0)
-
-        plt.suptitle('radii: '+ str(rad_val) + ' [microns]')
-        plt.savefig(savedir + 'species_colour/' + 'ratio_' + site_ins['site_short'] + '_f(RH)_MURK_colour_by_'+aer_i+'.png')
-        plt.close(fig)
+            plt.suptitle('radii: '+ str(rad_val) + ' [microns]')
+            plt.savefig(savedir + 'species_colour/' + 'ratio_' + site_ins['site_short'] + '_f(RH)_MURK_colour_by_'+aer_i+'.png')
+            plt.close(fig)
 
 
     print 'END PROGRRAM'
