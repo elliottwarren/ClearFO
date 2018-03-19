@@ -42,21 +42,7 @@ if __name__ == '__main__':
     # directories
     savedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/figures/Mie/daily_f(RH)/'
     fRHdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/daily_f(RH)/'
-    # specdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/' \
-    #           'monthly_f(RH)/sp_885-925_r_files/'
     pickleloaddir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/pickle/'
-
-
-    # # variables to take from file (as listed within the file) with index from BLOCK = 0
-    # # NOTE: data MUST be in ascending index order
-    # aer_index = {'Ammonium Sulphate': 1, 'Generic NaCl': 2, 'Biogenic': 3, 'Aged fossil-fuel OC': 4,
-    #              'Ammonium nitrate': 5}
-    # aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Aged fossil-fuel OC', 'Ammonium nitrate']
-    #
-    # aer_particles_chem = {'Ammonium Sulphate': '(NH4)2SO4', 'Generic NaCl': 'NaCl', 'Aged fossil-fuel OC': 'CORG',
-    #                       'Ammonium nitrate': 'NH4NO3', 'Soot': 'CBLK'}
-    #
-    # aer_particles = ['(NH4)2SO4', 'NH4NO3', 'NaCl', 'CORG', 'CBLK']
 
     # date resolution
     dataRes = 'daily'
@@ -71,11 +57,13 @@ if __name__ == '__main__':
     # ---------------------------------------------------
 
     f_RH_data = {}
+    rel_vol_species = {}
+    rel_vol_time = {}
 
-    # read in f(RH) for each site
     for site in ['NK', 'Ch', 'Ha']:
 
-        path = fRHdir + 'monthly_f(RH)_' + site + '_905.0nm.nc'
+        # read in f(RH) for each site
+        path = fRHdir + dataRes + '_f(RH)_' + site + '_905.0nm.nc'
 
         # eu.netCDF_info(path)
 
@@ -84,124 +72,185 @@ if __name__ == '__main__':
         f_RH_data[site] = rawdata['f(RH) MURK']
 
         if site == 'NK':
-            months = rawdata['months']
+            time = rawdata['times']
             RH = rawdata['Relative Humidity']
             radii_range_nm = rawdata['radii_range_nm']
+            radii_range_micron = radii_range_nm*1e-3
 
-    radii_range_micron = radii_range_nm*1e-3
+        # Read in relative volume of each species for each site
+        filename = pickleloaddir + site + '_daily_aerosol_relative_volume.pickle'
+        with open(filename, 'rb') as handle:
+            pickle_load_in = pickle.load(handle)
+        rel_vol_species[site] = pickle_load_in['pm10_rel_vol']
+        rel_vol_time[site] = pickle_load_in['time']
+
+    # append f(RH) and species together for the boxplotting - order of concatonation for both needs to be the same!
+    # f_RH_all.shape(time, radii, RH)
+    f_RH_all = np.concatenate((f_RH_data['NK'], f_RH_data['Ha'], f_RH_data['Ch']), axis=0)
+    rel_vol_species_all = {}
+    # rel_vol_species_all[species_i].shape(time)
+    for species_i in rel_vol_species['NK'].iterkeys():
+        rel_vol_species_all[species_i] = \
+            np.concatenate((rel_vol_species['NK'][species_i],
+                            rel_vol_species['Ha'][species_i],
+                            rel_vol_species['Ch'][species_i]), axis=0)
 
     # ---------------------------------------------------
     # Plotting
     # ---------------------------------------------------
 
+    # BOX PLOT - S binned by RH, then by soot
+
+    ## 1. set up bins to divide the data [%]
+    rh_bin_starts = np.array([0.0, 60.0, 70.0, 80.0, 90.0])
+    rh_bin_ends = np.append(rh_bin_starts[1:], 100.0)
+
+    # set up limit for soot last bin to be inf [fraction]
+    soot_starts = np.array([0.0, 0.04, 0.08])
+    soot_ends = np.append(soot_starts[1:], np.inf)
+    soot_bins_num = len(soot_starts)
+
+    # variables to help plot the legend
+    soot_starts_str = [str(int(i*100.0)) for i in soot_starts]
+    soot_ends_str = [str(int(i*100.0)) for i in soot_ends[:-1]] + ['100']
+    soot_legend_str = [i+'-'+j+' %' for i, j in zip(soot_starts_str, soot_ends_str)]
+    soot_colours = ['blue', 'orange', 'red']
+
+    # positions for each boxplot (1/6, 3/6, 5/6 into each bin, given 3 soot groups)
+    #   and widths for each boxplot
+    pos = []
+    widths = []
+    mid = []
+
+    # choose a radii to plot
+    # radii_range = array([   70.,   110.,   150.,  1000.,  3000.])
+    radii_idx = 1
+
+    # choose species to sub divide by
+    species_i = 'CBLK'
+
+    for i, (rh_s, rh_e) in enumerate(zip(rh_bin_starts, rh_bin_ends)):
+
+        bin_6th = (rh_e-rh_s) * 1.0/6.0 # 1/6th of the current bin width
+        pos += [[rh_s + bin_6th, rh_s +(3*bin_6th), rh_s+(5*bin_6th)]] #1/6, 3/6, 5/6 into each bin for the soot boxplots
+        widths += [bin_6th]
+        mid += [rh_s +(3*bin_6th)]
 
 
-    # 3. plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
-    # wrt_radii_radii_ratio
-    for month_idx in range(12):
+    # Split the data - keep them in lists to preserve the order when plotting
+    # bin_range_str will match each set of lists in rh_binned
+    rh_split = {'binned': [], 'mean': [], 'n': [], 'bin_range_str': [], 'pos': []}
 
-        date_i = dt.datetime(1900, month_idx+1, 1).strftime('%b')
+    for i, (rh_s, rh_e) in enumerate(zip(rh_bin_starts, rh_bin_ends)):
 
-        # find 0.11 ahead of time
-        # rad_0p11_idx = np.where(radii_range_micron == 0.11)[0][0]
+        # bin range
+        rh_split['bin_range_str'] += [str(int(rh_s)) + '-' + str(int(rh_e))]
 
-        # loop through an arbitrary list of RH values to plot
-        for rad_val in [0.7, 0.11, 3.0]:
+        # the list of lists for this RH bin (the actual data, the mean and sample number)
+        rh_bin_i = []
+        rh_bin_mean_i = []
+        rh_bin_n_i = []
 
-            fig = plt.figure(figsize=(6, 4))
+        # # extract out all S values that occured for this RH range and their corresponding CBLK weights
+        # rh_bool = np.logical_and(met['RH'] >= rh_s, met['RH'] < rh_e)
+        # S_rh_i = S[rh_bool]
+        # N_weight_cblk_rh_i = N_weight_pm10['CBLK'][rh_bool]
 
-            # find where rh_val is
-            _, rad_idx, _ = eu.nearest(radii_range_micron, rad_val)
-            # print rad_idx
+        # extract out data for this RH
+        rh_bool = np.logical_and(RH * 100.0 >= rh_s, RH * 100.0 < rh_e)
+        f_RH_i = f_RH_all[:, radii_idx, rh_bool]
+        rel_vol_species_rh_i = rel_vol_species_all[species_i]
 
-            for site in f_RH_data.iterkeys():
+        # idx of binned data
+        for soot_s, soot_e in zip(soot_starts, soot_ends):
 
-
-                # data to plot
-                f_RH_plot_data = np.squeeze(f_RH_data['Ch'][month_idx, rad_idx, :]) \
-                                 / f_RH_data[site][month_idx, rad_idx, :]
-
-                plt.plot(RH*100.0, f_RH_plot_data, label=site,
-                         linestyle='-')
-            # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
-
-            plt.xlabel('RH [%]')
-            plt.ylabel('f(RH)')
-            plt.ylim([0.0, 2.0])
-            plt.legend(loc='top left')
-            plt.suptitle(date_i + ' radii = ' + str(rad_val))
-            plt.savefig(savedir + 'compare/' + 'wrt_radii_ratio' + site + '_f(RH)_MURK_'+str(month_idx+1) + \
-                        '_radii_'+str(rad_val)+'.png')
-            plt.close(fig)
-
-    # 4. RATIO plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
-    # wrt_radii_monthly_ratio
-    for rad_val in [0.07, 0.11, 0.14, 0.4, 1.0, 3.0]:
-        fig = plt.figure(figsize=(6, 4))
-
-        # loop through an arbitrary list of RH values to plot
-
-        # find where rh_val is
-        rad_idx = np.where(radii_range_micron == rad_val)[0][0]
-        print rad_idx
-
-        for month_idx, month_i in enumerate(range(1, 13)):
-
-            # get colour and linestyle for month
-            for key, data in month_colours.iteritems():
-                if month_i in data:
-                    colour_i = key
-
-            for key, data in month_ls.iteritems():
-                if month_i in data:
-                    ls = key
-
-            # month as 3 letter str
-            date_i = dt.datetime(1900, month_i, 1).strftime('%b')
+            # booleon for the soot data, for this rh subsample
+            soot_bool = np.logical_and(rel_vol_species_rh_i >= soot_s, rel_vol_species_rh_i < soot_e)
+            f_RH_i_soot_j = f_RH_i[soot_bool] # soot subsample from the rh subsample
 
 
-            # ratio of f(RH) for this month / average across all months
-            f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
-                             / np.mean(f_RH['MURK'][:, rad_idx, :], axis=0)
+            # store the values for this bin
+            rh_bin_i += [f_RH_i_soot_j] # the of subsample
+            rh_bin_mean_i += [np.mean(f_RH_i_soot_j)] # mean of of subsample
+            rh_bin_n_i += [len(f_RH_i_soot_j)] # number of subsample
 
-            plt.plot(RH_int*100.0, f_RH_plot_data, label=date_i,
-                     linestyle=ls, color=colour_i)
-            # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
+        # add each set of rh_bins onto the full set of rh_bins
+        rh_split['binned'] += [rh_bin_i]
+        rh_split['mean'] += [rh_bin_mean_i]
+        rh_split['n'] += [rh_bin_n_i]
 
-        plt.xlabel('RH [%]')
-        plt.ylabel('f(RH)')
-        plt.ylim([0.8, 1.5])
-        plt.legend(loc='top left', ncol=2)
-        plt.suptitle('radii: '+ str(rad_val) + ' [microns]')
-        plt.savefig(savedir + 'wrt_radii_monthly_ratio/' + 'wrt_radii_ratio_' + site_ins['site_short'] + '_f(RH)_MURK_'+'%.2f' % rad_val+'.png')
-        plt.close(fig)
 
-    # # plot the data at the end so it is all neat and together
-    # fig = plt.figure(figsize=(6, 4))
-    #
-    # for key, value in data.iteritems():
-    #
-    #     plt.plot(RH*100, f_RH[key], label=key, linestyle='-')
-    #
-    # # plt.plot(value[:, 0], f_RH['average with Aitken Sulphate'], label='average with Aitken Sulphate', linestyle='-')
-    #
-    # # plot the MURK one
-    # # plt.plot(value[:, 0], f_RH['average'], label='average without Aitken Sulphate', color='black')
-    # plt.plot(RH*100, f_RH['MURK'], label='MURK', color='black')
-    #
-    # # plot soot as a constant until I get f(RH) for it
-    # plt.plot([0.0, 100.0], [1.0, 1.0], label='Soot')
-    #
-    # plt.legend(fontsize=10, loc='best')
-    # plt.tick_params(axis='both', labelsize=11)
-    # plt.xlabel('RH [%]', labelpad=0, fontsize=11)
-    # # plt.ylabel(Q_type + ' f(RH)')
-    # plt.ylabel(r'$f_{ext,rh}$', fontsize=11)
-    # plt.ylim([0.0, 8.0])
-    # plt.xlim([0.0, 100.0])
-    # # plt.title(file_name + ': ' + band_lam_range + ' band')
-    #
-    # plt.tight_layout() # moved tight_layout above... was originally after the save (06/04/17)
-    # plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_all_' + band_lam_range + '_salt8.0.png')
+    ## 2. Start the boxplots
+    # whis=[10, 90] wont work if the q1 or q3 extend beyond the whiskers... (the one bin with n=3...)
+    fig = plt.figure(figsize=(7, 3.5))
+    ax = plt.gca()
+    # fig, ax = plt.subplots(1, 1, figsize=(7, 3.5))
+    # plt.hold(True)
+    for j, (rh_bin_j, bin_range_str_j) in enumerate(zip(rh_split['binned'], rh_split['bin_range_str'])):
+
+        bp = plt.boxplot(list(rh_bin_j), widths=widths[j], positions=pos[j], whis=[5, 95], sym='x')
+
+        # colour the boxplots
+        for c, colour_c in enumerate(soot_colours):
+
+            # some parts of the boxplots are in two parts (e.g. 2 caps for each boxplot) therefore make an x_idx
+            #   for each pair
+            c_pair_idx = range(2*c, (2*c)+(len(soot_colours)-1))
+
+            plt.setp(bp['boxes'][c], color=colour_c)
+            plt.setp(bp['medians'][c], color=colour_c)
+            [plt.setp(bp['caps'][i], color=colour_c) for i in c_pair_idx]
+            [plt.setp(bp['whiskers'][i], color=colour_c) for i in c_pair_idx]
+            #[plt.setp(bp['fliers'][i], color=colour_c) for i in c_pair_idx]
+
+    print 'test'
+    # add sample number at the top of each box
+    (y_min, y_max) = ax.get_ylim()
+    upperLabels = [str(np.round(n, 2)) for n in np.hstack(rh_split['n'])]
+    for tick in range(len(np.hstack(pos))):
+        k = tick % 3
+        ax.text(np.hstack(pos)[tick], y_max - (y_max * (0.05)*(k+1)), upperLabels[tick],
+                 horizontalalignment='center', size='x-small')
+
+    ## 3. Prettify boxplot (legend, vertical lines, sample size at top)
+    # prettify
+    ax.set_xlim([0.0, 100.0])
+    ax.set_xticks(mid)
+    ax.set_xticklabels(rh_split['bin_range_str'])
+    ax.set_ylabel(r'$f(RH)$')
+    ax.set_xlabel(r'$RH \/[\%]$')
+    ax.set_yscale('log')
+    plt.suptitle(species_i + ': NK, Ch, Ha; radii='+str(radii_range_micron[radii_idx])+' microns')
+
+    # add vertical dashed lines to split the groups up
+    (y_min, y_max) = ax.get_ylim()
+    for rh_e in rh_bin_ends:
+        plt.vlines(rh_e, y_min, y_max, alpha=0.3, color='grey', linestyle='--')
+
+    # draw temporary lines to create a legend
+    lin=[]
+    for c, colour_c in enumerate(soot_colours):
+        # lin_i, = plt.plot([np.nanmean(S),np.nanmean(S)],color=colour_c) # plot line with matching colour
+        lin_i, = plt.plot([1.0, 1.0],color=colour_c) # plot line with matching colour
+        lin += [lin_i] # keep the line handle in a list for the legend plotting
+    plt.legend(lin, soot_legend_str, fontsize=10, loc=(0.03,0.68))
+    [i.set_visible(False) for i in lin] # set the line to be invisible
+
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.90)
+
+    ## 4. Save fig as unique image
+    i = 1
+    savepath = savedir + 'tester.png'
+
+    # ## 4. Save fig as unique image
+    # i = 1
+    # savepath = savedir + 'S_vs_RH_binnedSoot_'+period+'_'+savestr+'_boxplot_'+ceil_lambda_str_nm+'_'+str(i)+'.png'
+    # while os.path.exists(savepath) == True:
+    #     i += 1
+    #     savepath = savedir + 'S_vs_RH_binnedSoot_'+period+'_'+savestr+'_boxplot_'+ceil_lambda_str_nm+'_'+str(i)+'.png'
+
+    plt.savefig(savepath)
+
 
     print 'END PROGRRAM'
