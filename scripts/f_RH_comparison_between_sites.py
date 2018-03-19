@@ -101,156 +101,146 @@ if __name__ == '__main__':
 
     # BOX PLOT - S binned by RH, then by soot
 
-    ## 1. set up bins to divide the data [%]
-    rh_bin_starts = np.array([0.0, 60.0, 70.0, 80.0, 90.0])
-    rh_bin_ends = np.append(rh_bin_starts[1:], 100.0)
+    for species_i in ['CBLK']:
 
-    # set up limit for soot last bin to be inf [fraction]
-    soot_starts = np.array([0.0, 0.04, 0.08])
-    soot_ends = np.append(soot_starts[1:], np.inf)
-    soot_bins_num = len(soot_starts)
+        for radii_idx, radii_i in enumerate(radii_range_micron):
 
-    # variables to help plot the legend
-    soot_starts_str = [str(int(i*100.0)) for i in soot_starts]
-    soot_ends_str = [str(int(i*100.0)) for i in soot_ends[:-1]] + ['100']
-    soot_legend_str = [i+'-'+j+' %' for i, j in zip(soot_starts_str, soot_ends_str)]
-    soot_colours = ['blue', 'orange', 'red']
+            ## 1. set up bins to divide the data [%]
+            rh_bin_starts = np.array([0.0, 60.0, 70.0, 80.0, 90.0])
+            rh_bin_ends = np.append(rh_bin_starts[1:], 100.0)
 
-    # positions for each boxplot (1/6, 3/6, 5/6 into each bin, given 3 soot groups)
-    #   and widths for each boxplot
-    pos = []
-    widths = []
-    mid = []
+            # set up limit for soot last bin to be inf [fraction]
+            soot_starts = np.array([0.0, 0.04, 0.08])
+            soot_ends = np.append(soot_starts[1:], np.inf)
+            soot_bins_num = len(soot_starts)
 
-    # choose a radii to plot
-    # radii_range = array([   70.,   110.,   150.,  1000.,  3000.])
-    radii_idx = 1
+            # variables to help plot the legend
+            soot_starts_str = [str(int(i*100.0)) for i in soot_starts]
+            soot_ends_str = [str(int(i*100.0)) for i in soot_ends[:-1]] + ['100']
+            soot_legend_str = [i+'-'+j+' %' for i, j in zip(soot_starts_str, soot_ends_str)]
+            soot_colours = ['blue', 'orange', 'red']
 
-    # choose species to sub divide by
-    species_i = 'CBLK'
+            # positions for each boxplot (1/6, 3/6, 5/6 into each bin, given 3 soot groups)
+            #   and widths for each boxplot
+            pos = []
+            widths = []
+            mid = []
 
-    for i, (rh_s, rh_e) in enumerate(zip(rh_bin_starts, rh_bin_ends)):
+            for i, (rh_s, rh_e) in enumerate(zip(rh_bin_starts, rh_bin_ends)):
 
-        bin_6th = (rh_e-rh_s) * 1.0/6.0 # 1/6th of the current bin width
-        pos += [[rh_s + bin_6th, rh_s +(3*bin_6th), rh_s+(5*bin_6th)]] #1/6, 3/6, 5/6 into each bin for the soot boxplots
-        widths += [bin_6th]
-        mid += [rh_s +(3*bin_6th)]
+                bin_6th = (rh_e-rh_s) * 1.0/6.0 # 1/6th of the current bin width
+                pos += [[rh_s + bin_6th, rh_s +(3*bin_6th), rh_s+(5*bin_6th)]] #1/6, 3/6, 5/6 into each bin for the soot boxplots
+                widths += [bin_6th]
+                mid += [rh_s +(3*bin_6th)]
 
 
-    # Split the data - keep them in lists to preserve the order when plotting
-    # bin_range_str will match each set of lists in rh_binned
-    rh_split = {'binned': [], 'mean': [], 'n': [], 'bin_range_str': [], 'pos': []}
+            # Split the data - keep them in lists to preserve the order when plotting
+            # bin_range_str will match each set of lists in rh_binned
+            rh_split = {'binned': [], 'mean': [], 'n': [], 'bin_range_str': [], 'pos': []}
 
-    for i, (rh_s, rh_e) in enumerate(zip(rh_bin_starts, rh_bin_ends)):
+            for i, (rh_s, rh_e) in enumerate(zip(rh_bin_starts, rh_bin_ends)):
 
-        # bin range
-        rh_split['bin_range_str'] += [str(int(rh_s)) + '-' + str(int(rh_e))]
+                # bin range
+                rh_split['bin_range_str'] += [str(int(rh_s)) + '-' + str(int(rh_e))]
 
-        # the list of lists for this RH bin (the actual data, the mean and sample number)
-        rh_bin_i = []
-        rh_bin_mean_i = []
-        rh_bin_n_i = []
+                # the list of lists for this RH bin (the actual data, the mean and sample number)
+                rh_bin_i = []
+                rh_bin_mean_i = []
+                rh_bin_n_i = []
 
-        # # extract out all S values that occured for this RH range and their corresponding CBLK weights
-        # rh_bool = np.logical_and(met['RH'] >= rh_s, met['RH'] < rh_e)
-        # S_rh_i = S[rh_bool]
-        # N_weight_cblk_rh_i = N_weight_pm10['CBLK'][rh_bool]
+                # # extract out all S values that occured for this RH range and their corresponding CBLK weights
+                # rh_bool = np.logical_and(met['RH'] >= rh_s, met['RH'] < rh_e)
+                # S_rh_i = S[rh_bool]
+                # N_weight_cblk_rh_i = N_weight_pm10['CBLK'][rh_bool]
 
-        # extract out data for this RH
-        rh_bool = np.logical_and(RH * 100.0 >= rh_s, RH * 100.0 < rh_e)
-        f_RH_i = f_RH_all[:, radii_idx, rh_bool]
-        rel_vol_species_rh_i = rel_vol_species_all[species_i]
+                # extract out data for this RH
+                rh_bool = np.logical_and(RH * 100.0 >= rh_s, RH * 100.0 < rh_e)
+                f_RH_i = f_RH_all[:, radii_idx, rh_bool]
+                rel_vol_species_rh_i = rel_vol_species_all[species_i]
 
-        # idx of binned data
-        for soot_s, soot_e in zip(soot_starts, soot_ends):
+                # idx of binned data
+                for soot_s, soot_e in zip(soot_starts, soot_ends):
 
-            # booleon for the soot data, for this rh subsample
-            soot_bool = np.logical_and(rel_vol_species_rh_i >= soot_s, rel_vol_species_rh_i < soot_e)
-            f_RH_i_soot_j = f_RH_i[soot_bool] # soot subsample from the rh subsample
-
-
-            # store the values for this bin
-            rh_bin_i += [f_RH_i_soot_j] # the of subsample
-            rh_bin_mean_i += [np.mean(f_RH_i_soot_j)] # mean of of subsample
-            rh_bin_n_i += [len(f_RH_i_soot_j)] # number of subsample
-
-        # add each set of rh_bins onto the full set of rh_bins
-        rh_split['binned'] += [rh_bin_i]
-        rh_split['mean'] += [rh_bin_mean_i]
-        rh_split['n'] += [rh_bin_n_i]
+                    # booleon for the soot data, for this rh subsample
+                    soot_bool = np.logical_and(rel_vol_species_rh_i >= soot_s, rel_vol_species_rh_i < soot_e)
+                    f_RH_i_soot_j = f_RH_i[soot_bool] # soot subsample from the rh subsample
 
 
-    ## 2. Start the boxplots
-    # whis=[10, 90] wont work if the q1 or q3 extend beyond the whiskers... (the one bin with n=3...)
-    fig = plt.figure(figsize=(7, 3.5))
-    ax = plt.gca()
-    # fig, ax = plt.subplots(1, 1, figsize=(7, 3.5))
-    # plt.hold(True)
-    for j, (rh_bin_j, bin_range_str_j) in enumerate(zip(rh_split['binned'], rh_split['bin_range_str'])):
+                    # store the values for this bin
+                    rh_bin_i += [f_RH_i_soot_j] # the of subsample
+                    rh_bin_mean_i += [np.mean(f_RH_i_soot_j)] # mean of of subsample
+                    rh_bin_n_i += [len(f_RH_i_soot_j)] # number of subsample
 
-        bp = plt.boxplot(list(rh_bin_j), widths=widths[j], positions=pos[j], whis=[5, 95], sym='x')
+                # add each set of rh_bins onto the full set of rh_bins
+                rh_split['binned'] += [rh_bin_i]
+                rh_split['mean'] += [rh_bin_mean_i]
+                rh_split['n'] += [rh_bin_n_i]
 
-        # colour the boxplots
-        for c, colour_c in enumerate(soot_colours):
 
-            # some parts of the boxplots are in two parts (e.g. 2 caps for each boxplot) therefore make an x_idx
-            #   for each pair
-            c_pair_idx = range(2*c, (2*c)+(len(soot_colours)-1))
+            ## 2. Start the boxplots
+            # whis=[10, 90] wont work if the q1 or q3 extend beyond the whiskers... (the one bin with n=3...)
+            fig = plt.figure(figsize=(7, 3.5))
+            ax = plt.gca()
+            # fig, ax = plt.subplots(1, 1, figsize=(7, 3.5))
+            # plt.hold(True)
+            for j, (rh_bin_j, bin_range_str_j) in enumerate(zip(rh_split['binned'], rh_split['bin_range_str'])):
 
-            plt.setp(bp['boxes'][c], color=colour_c)
-            plt.setp(bp['medians'][c], color=colour_c)
-            [plt.setp(bp['caps'][i], color=colour_c) for i in c_pair_idx]
-            [plt.setp(bp['whiskers'][i], color=colour_c) for i in c_pair_idx]
-            #[plt.setp(bp['fliers'][i], color=colour_c) for i in c_pair_idx]
+                bp = plt.boxplot(list(rh_bin_j), widths=widths[j], positions=pos[j], whis=[5, 95], sym='x')
 
-    print 'test'
-    # add sample number at the top of each box
-    (y_min, y_max) = ax.get_ylim()
-    upperLabels = [str(np.round(n, 2)) for n in np.hstack(rh_split['n'])]
-    for tick in range(len(np.hstack(pos))):
-        k = tick % 3
-        ax.text(np.hstack(pos)[tick], y_max - (y_max * (0.05)*(k+1)), upperLabels[tick],
-                 horizontalalignment='center', size='x-small')
+                # colour the boxplots
+                for c, colour_c in enumerate(soot_colours):
 
-    ## 3. Prettify boxplot (legend, vertical lines, sample size at top)
-    # prettify
-    ax.set_xlim([0.0, 100.0])
-    ax.set_xticks(mid)
-    ax.set_xticklabels(rh_split['bin_range_str'])
-    ax.set_ylabel(r'$f(RH)$')
-    ax.set_xlabel(r'$RH \/[\%]$')
-    ax.set_yscale('log')
-    plt.suptitle(species_i + ': NK, Ch, Ha; radii='+str(radii_range_micron[radii_idx])+' microns')
+                    # some parts of the boxplots are in two parts (e.g. 2 caps for each boxplot) therefore make an x_idx
+                    #   for each pair
+                    c_pair_idx = range(2*c, (2*c)+(len(soot_colours)-1))
 
-    # add vertical dashed lines to split the groups up
-    (y_min, y_max) = ax.get_ylim()
-    for rh_e in rh_bin_ends:
-        plt.vlines(rh_e, y_min, y_max, alpha=0.3, color='grey', linestyle='--')
+                    plt.setp(bp['boxes'][c], color=colour_c)
+                    plt.setp(bp['medians'][c], color=colour_c)
+                    [plt.setp(bp['caps'][i], color=colour_c) for i in c_pair_idx]
+                    [plt.setp(bp['whiskers'][i], color=colour_c) for i in c_pair_idx]
+                    #[plt.setp(bp['fliers'][i], color=colour_c) for i in c_pair_idx]
 
-    # draw temporary lines to create a legend
-    lin=[]
-    for c, colour_c in enumerate(soot_colours):
-        # lin_i, = plt.plot([np.nanmean(S),np.nanmean(S)],color=colour_c) # plot line with matching colour
-        lin_i, = plt.plot([1.0, 1.0],color=colour_c) # plot line with matching colour
-        lin += [lin_i] # keep the line handle in a list for the legend plotting
-    plt.legend(lin, soot_legend_str, fontsize=10, loc=(0.03,0.68))
-    [i.set_visible(False) for i in lin] # set the line to be invisible
+            print 'test'
+            # add sample number at the top of each box
+            (y_min, y_max) = ax.get_ylim()
+            upperLabels = [str(np.round(n, 2)) for n in np.hstack(rh_split['n'])]
+            for tick in range(len(np.hstack(pos))):
+                k = tick % 3
+                ax.text(np.hstack(pos)[tick], y_max - (y_max * (0.05)*(k+1)), upperLabels[tick],
+                         horizontalalignment='center', size='x-small')
 
-    plt.tight_layout()
-    plt.subplots_adjust(top=0.90)
+            ## 3. Prettify boxplot (legend, vertical lines, sample size at top)
+            # prettify
+            ax.set_xlim([0.0, 100.0])
+            ax.set_xticks(mid)
+            ax.set_xticklabels(rh_split['bin_range_str'])
+            ax.set_ylabel(r'$f(RH)$')
+            ax.set_xlabel(r'$RH \/[\%]$')
+            ax.set_yscale('log')
+            plt.suptitle(species_i + ': NK, Ch, Ha; radii='+str(radii_range_micron[radii_idx])+' microns')
 
-    ## 4. Save fig as unique image
-    i = 1
-    savepath = savedir + 'tester.png'
+            # add vertical dashed lines to split the groups up
+            (y_min, y_max) = ax.get_ylim()
+            for rh_e in rh_bin_ends:
+                plt.vlines(rh_e, y_min, y_max, alpha=0.3, color='grey', linestyle='--')
 
-    # ## 4. Save fig as unique image
-    # i = 1
-    # savepath = savedir + 'S_vs_RH_binnedSoot_'+period+'_'+savestr+'_boxplot_'+ceil_lambda_str_nm+'_'+str(i)+'.png'
-    # while os.path.exists(savepath) == True:
-    #     i += 1
-    #     savepath = savedir + 'S_vs_RH_binnedSoot_'+period+'_'+savestr+'_boxplot_'+ceil_lambda_str_nm+'_'+str(i)+'.png'
+            # draw temporary lines to create a legend
+            lin=[]
+            for c, colour_c in enumerate(soot_colours):
+                # lin_i, = plt.plot([np.nanmean(S),np.nanmean(S)],color=colour_c) # plot line with matching colour
+                lin_i, = plt.plot([1.0, 1.0],color=colour_c) # plot line with matching colour
+                lin += [lin_i] # keep the line handle in a list for the legend plotting
+            plt.legend(lin, soot_legend_str, fontsize=10, loc=(0.03,0.68))
+            [i.set_visible(False) for i in lin] # set the line to be invisible
 
-    plt.savefig(savepath)
+            plt.tight_layout()
+            plt.subplots_adjust(top=0.90)
+
+            ## 4. Save fig as unique image
+            savepath = savedir + 'combined_'+species_i+'_'+str(radii_range_micron[radii_idx])+'.png'
+
+            plt.savefig(savepath)
+            plt.close(fig)
 
 
     print 'END PROGRRAM'
