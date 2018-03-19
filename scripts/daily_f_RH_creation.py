@@ -184,38 +184,46 @@ def calc_f_RH(data, aer_order, Q_type=''):
 
 # Saving
 
-def save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_nm_str):
+def save_fRH_netCDF(fRHdir, f_RH, size_extract_nm, RH_int, site_ins, ceil_lambda_nm_str, pm10_time, timeRes='daily'):
     """
     Create a netCDF file for the f(RH) information to be stored in.
     :param fRHdir: dircetory to save netCDF file to (should ideally be the monthly f(RH) dir)
     :param f_RH: f(RH) curves
-    :param radii_range_nm: needs to match the units if changed! [currently nm]
+    :param size_extract_nm: radii sizes used to make f(RH)
     :param RH_int: interpolated RH values [fraction]
     :param site_ins: site information
     :param ceil_lambda_nm_str: ceilometer wavelength as str with nm on the end e.g. '905.0nm'
+    :param pm10_time: time from the rel_vol calculations
+    param: timeRes: f(RH) time resolution
     :return:
 
     Store the MURK [month, radius, RH] AND species f(RH) curves [radius, RH]
     """
 
+    # prepare time so it is days after start day
+    # tdiffs is the number of days since the start day
+    start_day = pm10_time[0]
+    t_diff = np.array([i - start_day for i in pm10_time])
+    t_diff_days = np.array([i.days for i in t_diff])
+
     # create netCDF file
-    ncfile = Dataset(fRHdir + 'monthly_f(RH)_' + site_ins['site_short'] + '_' + ceil_lambda_nm_str + '.nc', 'w')
+    ncfile = Dataset(fRHdir + 'daily_f(RH)_' + site_ins['site_short'] + '_' + ceil_lambda_nm_str + '.nc', 'w')
 
     # create Dimensions
-    ncfile.createDimension('month', len(np.arange(1, 13)))
+    ncfile.createDimension('time', len(pm10_time))
     ncfile.createDimension('RH', len(RH_int))
-    ncfile.createDimension('radii_range', len(radii_range_nm))
+    ncfile.createDimension('radii_range', len(size_extract_nm))
 
     # create, fill and set units for co-ordinate variables
-    nc_month = ncfile.createVariable('months', np.float64, ('month',))
+    nc_times = ncfile.createVariable('times', np.float64, ('time',))
     nc_RH = ncfile.createVariable('Relative Humidity', np.float64, ('RH',))
     nc_radii_range_nm = ncfile.createVariable('radii_range_nm', np.float64, ('radii_range',))
 
-    nc_month[:] = np.arange(1, 13)
+    nc_times[:] = t_diff_days
     nc_RH[:] = RH_int
-    nc_radii_range_nm[:] = radii_range_nm
+    nc_radii_range_nm[:] = size_extract_nm
 
-    nc_month.units = 'month number'
+    nc_times.units = 'days since ' + start_day.strftime('%Y-%m-%d %H:%M')
     nc_RH.units = 'fraction'
     nc_radii_range_nm.units = 'nm'
 
@@ -224,7 +232,7 @@ def save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_
         var_name = 'f(RH) ' + species_i
 
         if var_name == 'f(RH) MURK':
-            nc_f_RH_MURK = ncfile.createVariable('f(RH) MURK', np.float64, ('month', 'radii_range', 'RH'))
+            nc_f_RH_MURK = ncfile.createVariable('f(RH) MURK', np.float64, ('time', 'radii_range', 'RH'))
             nc_f_RH_MURK[:] = f_RH['MURK']
         else:
             nc_f_RH_species_i = ncfile.createVariable(var_name, np.float64, ('radii_range', 'RH'))
@@ -266,12 +274,12 @@ if __name__ == '__main__':
     # Setup
     # ------------------------------------------
     # site information
-    # site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
-    #             'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
+    site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
+                'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
     # site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
     #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
-    site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
-                'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
+    # site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
+    #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
 
     ceil_lambda_nm_str = str(site_ins['ceil_lambda'] * 1e9) + 'nm'
 
@@ -286,10 +294,10 @@ if __name__ == '__main__':
     # -------------------------
 
     # directories
-    savedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/figures/Mie/monthly_f(RH)/'
-    fRHdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/monthly_f(RH)/'
+    savedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/figures/Mie/daily_f(RH)/'
+    fRHdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/daily_f(RH)/'
     specdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/' \
-              'monthly_f(RH)/sp_885-925_r_files/'
+              'sp_885-925_r_files/'
     pickleloaddir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/pickle/'
 
 
@@ -316,6 +324,10 @@ if __name__ == '__main__':
     # colours = cm.jet(np.linspace(0, 1, res))
     # norm = mpl.colors.Normalize(vmin=0, vmax=100)
 
+    # sizes to extract
+    size_extract_microns = np.array([0.07, 0.11, 0.15, 1.0, 3.0])
+    size_extract_nm = np.array([i * 1e3 for i in size_extract_microns])
+
     # ---------------------------------------------------
     # Read, Process and save f(RH)
     # ---------------------------------------------------
@@ -323,10 +335,11 @@ if __name__ == '__main__':
     # read in relative volume of aerosol species
     #   created in VMachine "create_Qext_for_MURK_.py" and saved as a pickle
     # # read in any pickled S data from before
-    filename = pickleloaddir + site_ins['site_short'] + '_aerosol_relative_volume.pickle'
+    filename = pickleloaddir + site_ins['site_short'] + '_daily_aerosol_relative_volume.pickle'
     with open(filename, 'rb') as handle:
         pickle_load_in = pickle.load(handle)
     pm10_rel_vol = pickle_load_in['pm10_rel_vol']
+    pm10_time = pickle_load_in['time']
 
     # range of radii to iterate over
     radii_range_m = np.arange(0.005e-06, 3.685e-6 + 0.005e-06, 0.005e-06)
@@ -340,16 +353,16 @@ if __name__ == '__main__':
     #   MURK data will be in a 3D array [month, size, RH]
     #   all other speices will be 2D [size, RH] as they wont vary each month
     f_RH = {}
-    f_RH['MURK'] = np.empty((12, len(radii_range_nm), 101))
+    f_RH['MURK'] = np.empty((len(pm10_time), len(size_extract_nm), 101))
     f_RH['MURK'][:] = np.nan
     for species_i in aer_particles:
-        f_RH[species_i] = np.empty((len(radii_range_nm), 101))
+        f_RH[species_i] = np.empty((len(size_extract_nm), 101))
         f_RH[species_i][:] = np.nan
 
 
-    for radius_idx, radius_nm_i in enumerate(radii_range_nm):
+    for array_idx, radius_nm_i in enumerate(size_extract_nm):
 
-        print radius_idx
+        print 'on size: ' +str(radius_nm_i)
 
         # format of radius used in the filename
         #   trying to use m or microns leads to rounding errors when making the string...
@@ -384,28 +397,28 @@ if __name__ == '__main__':
 
         # soot is always the same (fixed at 1)
         interp_f_RH_i['Soot'] = np.repeat(1.0, 101)
-        f_RH['CBLK'][radius_idx, :] = interp_f_RH_i['Soot']
+        f_RH['CBLK'][array_idx, :] = interp_f_RH_i['Soot']
 
         # all species excluding soot
         for species_i, chem_i in aer_particles_chem.iteritems():
             f = interp1d(RH, f_RH_i[species_i], kind='linear')
             interp_f_RH_i[species_i] = f(RH_int)
-            f_RH[chem_i][radius_idx, :] = interp_f_RH_i[species_i]
+            f_RH[chem_i][array_idx, :] = interp_f_RH_i[species_i]
 
         # make f(RH) for murk from the interpolated f(RH)
-        for month_idx in range(12):
-            f_RH['MURK'][month_idx, radius_idx, :] = \
-                (interp_f_RH_i['Ammonium Sulphate'] * pm10_rel_vol['(NH4)2SO4'][month_idx]) + \
-                (interp_f_RH_i['Ammonium nitrate'] * pm10_rel_vol['NH4NO3'][month_idx]) + \
-                (interp_f_RH_i['Aged fossil-fuel OC'] * pm10_rel_vol['CORG'][month_idx]) + \
-                (interp_f_RH_i['Soot'] * pm10_rel_vol['CBLK'][month_idx]) + \
-                (interp_f_RH_i['Generic NaCl'] * pm10_rel_vol['NaCl'][month_idx])
+        for t_idx, t in enumerate(pm10_time):
+            f_RH['MURK'][t_idx, array_idx, :] = \
+                (interp_f_RH_i['Ammonium Sulphate'] * pm10_rel_vol['(NH4)2SO4'][t_idx]) + \
+                (interp_f_RH_i['Ammonium nitrate'] * pm10_rel_vol['NH4NO3'][t_idx]) + \
+                (interp_f_RH_i['Aged fossil-fuel OC'] * pm10_rel_vol['CORG'][t_idx]) + \
+                (interp_f_RH_i['Soot'] * pm10_rel_vol['CBLK'][t_idx]) + \
+                (interp_f_RH_i['Generic NaCl'] * pm10_rel_vol['NaCl'][t_idx])
 
 
     # save f(RH) once all radii have been looped through
     if saveFRH == True:
 
-        save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_nm_str)
+        save_fRH_netCDF(fRHdir, f_RH, size_extract_nm, RH_int, site_ins, ceil_lambda_nm_str, pm10_time, timeRes='daily')
 
 
     # ---------------------------------------------------
