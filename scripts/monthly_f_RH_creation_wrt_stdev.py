@@ -412,48 +412,5 @@ if __name__ == '__main__':
         plt.savefig(savedir + 'wrt_stdev_ratio/' + 'stdev_ratio_' + site_ins['site_short'] + '_f(RH)_MURK_'+str(month_idx+1))
         plt.close(fig)
 
-    # # 4. RATIO plot f(RH) for MURK, with respect to RH, for large particle sizes (> 0.4 microns)
-    # # wrt_radii_monthly_ratio
-    # for rad_val in [0.07, 0.11, 0.14, 0.4, 1.0, 3.0]:
-    #     fig = plt.figure(figsize=(6, 4))
-    #
-    #     # loop through an arbitrary list of RH values to plot
-    #
-    #     # find where rh_val is
-    #     rad_idx = np.where(radii_range_micron == rad_val)[0][0]
-    #     print rad_idx
-    #
-    #     for month_idx, month_i in enumerate(range(1, 13)):
-    #
-    #         # get colour and linestyle for month
-    #         for key, data in month_colours.iteritems():
-    #             if month_i in data:
-    #                 colour_i = key
-    #
-    #         for key, data in month_ls.iteritems():
-    #             if month_i in data:
-    #                 ls = key
-    #
-    #         # month as 3 letter str
-    #         date_i = dt.datetime(1900, month_i, 1).strftime('%b')
-    #
-    #
-    #         # ratio of f(RH) for this month / average across all months
-    #         f_RH_plot_data = np.squeeze(f_RH['MURK'][month_idx, rad_idx, :]) \
-    #                          / np.mean(f_RH['MURK'][:, rad_idx, :], axis=0)
-    #
-    #         plt.plot(RH_int*100.0, f_RH_plot_data, label=date_i,
-    #                  linestyle=ls, color=colour_i)
-    #         # plt.axvline(0.11, color='grey', alpha=0.3, linestyle='--')
-    #
-    #     plt.xlabel('RH [%]')
-    #     plt.ylabel('f(RH)')
-    #     plt.ylim([0.8, 1.5])
-    #     plt.legend(loc='top left', ncol=2)
-    #     plt.suptitle('radii: '+ str(rad_val) + ' [microns]')
-    #     plt.savefig(savedir + 'wrt_radii_monthly_ratio/' + 'wrt_radii_ratio_' + site_ins['site_short'] + '_f(RH)_MURK_'+'%.2f' % rad_val+'.png')
-    #     plt.close(fig)
-
-
 
     print 'END PROGRRAM'
