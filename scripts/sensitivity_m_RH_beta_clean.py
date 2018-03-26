@@ -117,10 +117,8 @@ def calc_Q_ext_wet(ceil_lam, r_md, RH):
 
     return Q, Q_ext_dry_matrix, f_RH_matrix
 
-def aer_ext_scat(q_aer, RH, r0 = FOcon.r0_haywood, p = FOcon.p_aer,
-                 B=FOcon.B_activation_haywood, S = FOcon.LidarRatio['Aerosol'],
-                 N0=FOcon.N0_aer, m0 = FOcon.m0_aer, eta = FOcon.eta, Q = FOcon.Q_ext_aer,
-                 r_md = []):
+def aer_ext_scat(q_aer, RH, r0 = FOcon.r0_haywood, p = FOcon.p_aer, S = FOcon.LidarRatio['Aerosol'],
+                 N0=FOcon.N0_aer, m0 = FOcon.m0_aer, eta = FOcon.eta, r_md = []):
                  #, lnRH = [], BolnRH = []):
 
     """
@@ -148,31 +146,31 @@ def aer_ext_scat(q_aer, RH, r0 = FOcon.r0_haywood, p = FOcon.p_aer,
 
     RH_factor = 0.01  # Relative Humidity in 0.38 not 38%
 
-    # eq 12 - calc rm for RH greater than critical
-    if RH.shape[0] == 1:
-        if RH >= RH_crit:
-            rm = np.ones(RH.shape) - (B / np.log(RH_factor * RH))
-            rm2 = np.power(rm, 1. / 3.)
-            rm = np.array(r_md) * rm2
-        else:
-            rm = r_md
-
-    else: # RH shape > 1
-        # set up rm array
-        rm = np.empty(RH.shape)
-        rm[:] = np.nan
-
-        # find instances above and below critical threshold
-        gt_idx = np.where(RH >= RH_crit)[0]
-        ls_idx = np.where(RH < RH_crit)[0]
-
-        # swell those above the threshold, keep rm as r_md where below.
-        if gt_idx.size: # if not empty
-            rm[gt_idx] = np.ones(gt_idx.shape) - (B / np.log(RH_factor * RH[gt_idx]))
-            rm2 = np.power(rm[gt_idx], 1. / 3.)
-            rm[gt_idx] = np.array(r_md) * rm2
-            # ToDo only works if RH shape > 1 BUT q_aer shape is also == 1!
-        rm[ls_idx] = r_md
+    # # eq 12 - calc rm for RH greater than critical
+    # # Old - original approach. No longer used with f(RH)
+    # if RH.shape[0] == 1:
+    #     if RH >= RH_crit:
+    #         rm = np.ones(RH.shape) - (B / np.log(RH_factor * RH))
+    #         rm2 = np.power(rm, 1. / 3.)
+    #         rm = np.array(r_md) * rm2
+    #     else:
+    #         rm = r_md
+    #
+    # else: # RH shape > 1
+    #     # set up rm array
+    #     rm = np.empty(RH.shape)
+    #     rm[:] = np.nan
+    #
+    #     # find instances above and below critical threshold
+    #     gt_idx = np.where(RH >= RH_crit)[0]
+    #     ls_idx = np.where(RH < RH_crit)[0]
+    #
+    #     # swell those above the threshold, keep rm as r_md where below.
+    #     if gt_idx.size: # if not empty
+    #         rm[gt_idx] = np.ones(gt_idx.shape) - (B / np.log(RH_factor * RH[gt_idx]))
+    #         rm2 = np.power(rm[gt_idx], 1. / 3.)
+    #         rm[gt_idx] = np.array(r_md) * rm2
+    #     rm[ls_idx] = r_md
 
     # Close to activation one must solve the full equation (Kohler curve), not done in this code.
     # Assumptions made here include:
@@ -229,7 +227,7 @@ kg_2_micro_g = 1.0e9
 m_2_microns = 1.0e6
 m3_2_cm3 = 1.0e-06
 
-# fixed murk at 40 mg kg-1
+# fixed murk mg kg-1
 q_aer_fix = np.array([10])
 
 # create range of murk and RH
@@ -258,6 +256,35 @@ for RH_i in RH_range:
     beta[str(RH_i)] = all_vars['beta']
 
 
+# Beta and alpha with different N_0
+# -------------------------------------
+# Fix RH and extract out specific m values, in order to compare across the different N_0s.
+
+# Different N_0 [cm-3] (variable name style: N0 per cm3)
+N0_pcm3 = [3769, 4461, 5426, 6824, 4471] # as in table 4 of paper 1
+N0_pm3 = [i*1.0e06 for i in N0_pcm3]
+
+alpha_diff_N0 = []
+beta_diff_N0 = []
+
+
+# for N0_pm3_i, N0_pcm3_i in zip(N0_pm3, N0_pcm3):
+for N0_pm3_i in N0_pm3:
+
+    for RH_i in [60.0]:
+
+        # create a numpy array of the length of m_range full of RH_i to use as input to aer_ext_scat
+        RH_i_array = np.empty(len(m_range))
+        RH_i_array[:] = RH_i
+
+        # m in [kg kg-1], RH in [frac]
+        all_vars = aer_ext_scat(m_range, RH_i_array, N0=N0_pm3_i)
+
+        # extract out beta at a set m
+        # m_range[18] = 18.0 micrograms kg-1
+        alpha_diff_N0 += [all_vars['alpha'][18]]
+        beta_diff_N0 += [all_vars['beta'][18]]
+
 # -----------------------------------------------------------
 # 3. Plot each with respect to beta
 # -----------------------------------------------------------
@@ -281,10 +308,10 @@ for RH_i in RH_range:
 plt.legend(loc='best', fancybox=True, framealpha=0.5)
 
 # plt.xlabel('aerosol [micrograms kg^-1]')
-plt.xlabel(r'$m_{MURK} \/\mathrm{[\mu g\/ kg^{-1}]}$', labelpad=2)
+plt.xlabel(r'$m \/\mathrm{[\mu g\/ kg^{-1}]}$', labelpad=2)
 plt.ylabel(r'$\beta_{m,\/unatt} \/\mathrm{[m^{-1} sr^{-1}]}$', labelpad=2)
 plt.xlim([0.0, np.max(m_range)])
-plt.ylim([0.0, 1.0e-5])
+plt.ylim([0.0, 6.0e-6])
 ax = plt.gca()
 # ax.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
 ax.set_yticklabels(["{:.1e}".format(t) for t in ax.get_yticks()])
@@ -296,6 +323,6 @@ plt.grid()
 plt.tight_layout()
 
 fn2 = 'm_and_RH_vs_beta_v0.2.png'
-plt.savefig(savedir + fn2)
+#plt.savefig(savedir + fn2)
 
 print 'END PROGRAM'
