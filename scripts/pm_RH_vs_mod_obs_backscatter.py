@@ -330,7 +330,7 @@ def discrete_colour_map(lower_bound, upper_bound, spacing):
 
     return cmap, norm
 
-def main():
+if __name__ == '__main__':
 
     # ==============================================================================
     # Setup
@@ -353,7 +353,7 @@ def main():
 
     # statistics to run
     pm10_stats = True
-    rh_stats = False
+    rh_stats = True
 
     # # instruments and other settings
     #site_rh = FOcon.site_rh
@@ -568,28 +568,48 @@ def main():
                 statistics[site_id]['abs_back_diff_log'] += [np.abs(np.log10(mod_back_i) - np.log10(obs_back_i))]
 
 
+    # calculate basic statistics for a table in paper 1
+    basic_stats = {}
+    for var in ['back', 'rh', 'aer']:
+        var_mod = var+'_mod'
+        var_obs = var+'_obs'
+
+        basic_stats[var] = {}
+
+        basic_stats[var]['mod_mean'] = np.nanmean(statistics[site_id][var_mod])
+        basic_stats[var]['mod_median'] = np.nanmedian(statistics[site_id][var_mod])
+        basic_stats[var]['mod_stdev'] = np.nanstd(statistics[site_id][var_mod])
+        basic_stats[var]['mod_IQR'] = np.nanpercentile(statistics[site_id][var_mod], 75) - np.nanpercentile(statistics[site_id][var_mod], 25)
+
+        basic_stats[var]['obs_mean'] = np.nanmean(statistics[site_id][var_obs])
+        basic_stats[var]['obs_median'] = np.nanmedian(statistics[site_id][var_obs])
+        basic_stats[var]['obs_stdev'] = np.nanstd(statistics[site_id][var_obs])
+        basic_stats[var]['obs_IQR'] = np.nanpercentile(statistics[site_id][var_obs], 75) - np.nanpercentile(statistics[site_id][var_obs], 25)
+
+        basic_stats[var]['mean_diff'] = np.nanmean(statistics[site_id][var_mod]) - np.nanmean(statistics[site_id][var_obs])
+        basic_stats[var]['pct_diff'] = ((np.nanmean(statistics[site_id][var_mod]) / np.nanmean(statistics[site_id][var_obs])) * 100.0) - 100.0
+        basic_stats[var]['ratio'] = np.nanmean(statistics[site_id][var_mod]) / np.nanmean(statistics[site_id][var_obs])
 
 
-
-    # quick remove RH > x
-    for val in np.arange(40, 110, 10):
-
-        stats_copy = deepcopy(statistics[site_id])
-
-        idx_lt = np.where(np.array(stats_copy['rh_mod']) >= val)
-
-        for key in stats_copy.iterkeys():
-            if len(stats_copy[key]) != 0:
-                for i in idx_lt[0]:
-                    stats_copy[key][i] = np.nan
-        sampleSize -= len(idx_lt[0])
-        r, p = spearmanr(stats_copy['aer_diff'], stats_copy['back_diff_log'],
-                         nan_policy='omit')
-
-        print 'val =' + str(val)
-        print r
-        print p
-        print ''
+    # # quick remove RH > x
+    # for val in np.arange(40, 110, 10):
+    #
+    #     stats_copy = deepcopy(statistics[site_id])
+    #
+    #     idx_lt = np.where(np.array(stats_copy['rh_mod']) >= val)
+    #
+    #     for key in stats_copy.iterkeys():
+    #         if len(stats_copy[key]) != 0:
+    #             for i in idx_lt[0]:
+    #                 stats_copy[key][i] = np.nan
+    #     sampleSize -= len(idx_lt[0])
+    #     r, p = spearmanr(stats_copy['aer_diff'], stats_copy['back_diff_log'],
+    #                      nan_policy='omit')
+    #
+    #     print 'val =' + str(val)
+    #     print r
+    #     print p
+    #     print ''
 
 
     # do correlation
@@ -757,36 +777,83 @@ def main():
     #     plt.savefig(savedir + 'a_vs_height(i).png')
 
 
+    # ----------------------
+
+    # SCATTER - beta_m vs beta_o, coloured by rh_obs
+    # simple plot for paper 1, given the reviewers comments
+
+    # extract x and y data so the plotting code is more readable
+    x_data = statistics[site]['back_obs']
+    y_data = statistics[site]['back_mod']
+    c_key = 'rh_obs'
+    c_data = statistics[site][c_key]
+
+    # c_min = -40.0
+    # c_max = 100.0
+
+    c_min = 40.0
+    c_max = 100.0
+
+    # c_min = -30.0
+    # c_max = 30.0
+
+    fig = plt.figure(figsize=(7.5, 4))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+
+    # define the colormap
+    cmap, norm = discrete_colour_map(c_min, c_max, 13)
+
+    # plot data
+    # scat = plt.scatter(x_data, y_data, c=statistics[site]['rh_obs'], s=6, vmin=40.0, vmax=100.0, cmap=cmap, norm=norm)
+    scat = plt.scatter(x_data, y_data, c=c_data, s=6, vmin=c_min, vmax=c_max, cmap=cmap, norm=norm)
+
+    # add 1-to-1 line
+    plt.plot([np.nanmin([x_data, y_data]), np.nanmin([x_data, y_data])],
+             [np.nanmax([x_data, y_data]), np.nanmax([x_data, y_data])],
+             linestyle='--', color='grey', alpha=0.5)
+
+    # # add 0 lines
+    # ax.axhline(linestyle='--', color='grey', alpha=0.5)
+    # ax.axvline(linestyle='--', color='grey', alpha=0.5)
+
+    # ax.set_ylim([-5e-06, 5e-06])
+
+    # add colourbar on the side
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = plt.colorbar(scat, cax=cax, norm=norm)
+    if c_key[:2] == 'rh':
+        cbar.set_label(r'$RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
+    elif c_key[:3] == 'aer' :
+        cbar.set_label(r'$m\/[\mu g\/ kg^{-1}]$', labelpad=-38, y=1.075, rotation=0)
 
 
+    ax.set_xlabel(r'$\mathrm{\beta_o}$')
+    ax.set_ylabel(r'$\mathrm{\beta_m}$')
+    ax.set_ylim([np.nanmin(y_data), np.nanmax(y_data)])
+    ax.set_xlim([np.nanmin(x_data), np.nanmax(x_data)])
+    #ax.set_ylim([-1e-5, 1e-5])
+    #ax.set_xlim([-1e-5, 1e-5])
+    # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+    ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
 
+    # Fake a ScalarMappable so I can display a colormap
+    # cmap, norm = mcolors.from_levels_and_colors(range(24 + 1), rgb)
+    # sm = matplotlib.cm.ScalarMappable(cmap=cmap, norm=norm)
+    # sm.set_array([])
+    # fig.colorbar(sm)
+    # plt.colorbar()
 
+    #fig.suptitle(ceil + '; n = ' + str(sampleSize) + '; r = ' + '{:1.2f}'.format(corr['r']) +
+    #             '; p = ' + '%1.2f' % corr['p'])
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.90)
+    plt.savefig(savedir + 'beta_o_vs_beta_m/' +
+                model_type + '_scatter_beta_m_vs_beta_o_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '_c_'+c_key+'_'+
+                '.png')  # filename
 
-
-
-
-
-    return
-
-if __name__ == '__main__':
-    main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    plt.close(fig)
 
 
 
