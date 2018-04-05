@@ -570,9 +570,11 @@ if __name__ == '__main__':
 
     # calculate basic statistics for a table in paper 1
     basic_stats = {}
-    for var in ['back', 'rh', 'aer']:
+    # for var in ['back', 'rh', 'aer']:
+    for var in ['rh', 'aer']:
         var_mod = var+'_mod'
         var_obs = var+'_obs'
+        var_diff = var+'_diff'
 
         basic_stats[var] = {}
 
@@ -586,9 +588,9 @@ if __name__ == '__main__':
         basic_stats[var]['obs_stdev'] = np.nanstd(statistics[site_id][var_obs])
         basic_stats[var]['obs_IQR'] = np.nanpercentile(statistics[site_id][var_obs], 75) - np.nanpercentile(statistics[site_id][var_obs], 25)
 
-        basic_stats[var]['mean_diff'] = np.nanmean(statistics[site_id][var_mod]) - np.nanmean(statistics[site_id][var_obs])
-        basic_stats[var]['pct_diff'] = ((np.nanmean(statistics[site_id][var_mod]) / np.nanmean(statistics[site_id][var_obs])) * 100.0) - 100.0
-        basic_stats[var]['ratio'] = np.nanmean(statistics[site_id][var_mod]) / np.nanmean(statistics[site_id][var_obs])
+        basic_stats[var]['mean_diff'] = np.nanmean(statistics[site_id][var_diff])
+        basic_stats[var]['pct_diff'] = []
+        #basic_stats[var]['ratio'] = np.nanmean([i / j for i, j in [statistics[site_id][var_mod], statistics[site_id][var_obs]]])
 
 
     # # quick remove RH > x
@@ -812,10 +814,6 @@ if __name__ == '__main__':
              [np.nanmax([x_data, y_data]), np.nanmax([x_data, y_data])],
              linestyle='--', color='grey', alpha=0.5)
 
-    # # add 0 lines
-    # ax.axhline(linestyle='--', color='grey', alpha=0.5)
-    # ax.axvline(linestyle='--', color='grey', alpha=0.5)
-
     # ax.set_ylim([-5e-06, 5e-06])
 
     # add colourbar on the side
@@ -834,16 +832,8 @@ if __name__ == '__main__':
     ax.set_xlim([np.nanmin(x_data), np.nanmax(x_data)])
     #ax.set_ylim([-1e-5, 1e-5])
     #ax.set_xlim([-1e-5, 1e-5])
-    # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
     ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
     ax.xaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-
-    # Fake a ScalarMappable so I can display a colormap
-    # cmap, norm = mcolors.from_levels_and_colors(range(24 + 1), rgb)
-    # sm = matplotlib.cm.ScalarMappable(cmap=cmap, norm=norm)
-    # sm.set_array([])
-    # fig.colorbar(sm)
-    # plt.colorbar()
 
     #fig.suptitle(ceil + '; n = ' + str(sampleSize) + '; r = ' + '{:1.2f}'.format(corr['r']) +
     #             '; p = ' + '%1.2f' % corr['p'])
@@ -856,7 +846,82 @@ if __name__ == '__main__':
     plt.close(fig)
 
 
+    # -----------------------------------------------
 
+    # RATIO SCATTER - beta_m vs beta_o, coloured by rh_obs
+    # simple plot for paper 1, given the reviewers comments
+
+    # extract x and y data so the plotting code is more readable
+    x_data = statistics[site]['rh_mod']
+    y_data = np.array(statistics[site]['back_mod']) / np.array(statistics[site]['back_obs'])
+    c_key = 'aer_diff'
+    c_data = statistics[site][c_key]
+
+    # aer_diff
+    c_min = -40.0
+    c_max = 100.0
+
+    # # aer mod
+    # c_min = 0.0
+    # c_max = 100.0
+
+    # # rh diff
+    # c_min = -30.0
+    # c_max = 30.0
+
+    fig = plt.figure(figsize=(6, 4.5))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+
+    # define the colormap
+    # cmap, norm = discrete_colour_map(c_min, c_max, 13)
+    cmap, norm = discrete_colour_map(c_min, c_max, 15)
+
+    # plot data
+    # scat = plt.scatter(x_data, y_data, c=statistics[site]['rh_obs'], s=6, vmin=40.0, vmax=100.0, cmap=cmap, norm=norm)
+    scat = plt.scatter(x_data, y_data, c=c_data, s=6, vmin=c_min, vmax=c_max, cmap=cmap, norm=norm)
+
+    # add 1-to-1 line
+    plt.plot([np.nanmin([x_data, y_data]), np.nanmin([x_data, y_data])],
+             [np.nanmax([x_data, y_data]), np.nanmax([x_data, y_data])],
+             linestyle='--', color='grey', alpha=0.5)
+
+    # # add 0 lines
+    # ax.axhline(linestyle='--', color='grey', alpha=0.5)
+    # ax.axvline(linestyle='--', color='grey', alpha=0.5)
+
+    # ax.set_ylim([-5e-06, 5e-06])
+    ax.set_ylim([0.0, 4.5])
+    # ax.set_ylim([np.nanmin([x_data, y_data]), np.nanmax([x_data, y_data])])
+    ax.set_xlim([np.nanmin([x_data, y_data]), np.nanmax([x_data, y_data])])
+
+    # add colourbar on the side
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    cbar = plt.colorbar(scat, cax=cax, norm=norm)
+    if c_key[:2] == 'rh':
+        cbar.set_label(r'$RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
+    elif c_key[:3] == 'aer' :
+        cbar.set_label(r'$\Delta\/m\/[\mu g\/ kg^{-1}]$', labelpad=-38, y=1.075, rotation=0)
+        # cbar.set_label(r'$m\/[\mu g\/ kg^{-1}]$', labelpad=-38, y=1.075, rotation=0)
+
+
+    ax.set_xlabel(r'$RH$')
+    ax.set_ylabel(r'$\mathrm{\beta_m / \beta_o}$')
+    ax.set_ylim([np.nanmin(y_data), np.nanmax(y_data)])
+    #ax.set_ylim([-1e-5, 1e-5])
+    #ax.set_xlim([-1e-5, 1e-5])
+    # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
+    # ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+
+    #fig.suptitle(ceil + '; n = ' + str(sampleSize) + '; r = ' + '{:1.2f}'.format(corr['r']) +
+    #             '; p = ' + '%1.2f' % corr['p'])
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.90)
+    plt.savefig(savedir + 'beta_o_vs_beta_m/' +
+                model_type + '_scatter_beta_m_beta_o_ratio_vs_rh_mod_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '_c_'+c_key+'_'+
+                '.png')  # filename
+
+    plt.close(fig)
 
 
 
