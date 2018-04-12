@@ -93,7 +93,8 @@ def create_stats_entry(site_id, statistics={}):
                                'diff': {},
                                'RMSE': {},
                                'MBE': {},
-                               'MAE': {}}
+                               'MAE': {},
+                               'AE': {}}
 
 
         for hr in hrs:
@@ -102,10 +103,11 @@ def create_stats_entry(site_id, statistics={}):
             statistics[site_id]['diff'][str(hr)] = []
             statistics[site_id]['RMSE'][str(hr)] = []
             statistics[site_id]['MAE'][str(hr)] = []
+            statistics[site_id]['AE'][str(hr)] = []
 
     return statistics
 
-def create_stats_summary_dict_mean(site_id, summary={}):
+def create_stats_summary_dict(site_id, summary={}):
 
     """
     Define or expand the almighty summary statistics array
@@ -128,40 +130,9 @@ def create_stats_summary_dict_mean(site_id, summary={}):
     if site_id not in summary:
 
         # define site based lists to store the correlation results in
-        summary[site_id] = {'mean': nanArray, 'mean_plus_stdev': nanArray,
-                               'mean_minus_stdev': nanArray,
-                               'stdev': nanArray,
-                               'hrs': hrs}
-
-    return summary
-
-def create_stats_summary_dict_med(site_id, summary={}):
-
-    """
-    Define or expand the almighty summary statistics array
-    summary will be a dictionary for a different statistic e.g. corr or rmse
-
-    :param site_id:
-    :param summary:
-    :return: summary
-    """
-
-    # statistics will be grouped based on hour, so create a simple hourly array [0 ... 23]
-    hrs = np.arange(0, 24)
-
-    # define nanArray
-    # idea is to preestablish the array size, so it can be indexed into. When the statistic is made for that hour,
-    # it can be placed in the correct position. If the stat cannot be made, the idx will remain nan.
-    nanArray = np.empty(24)
-    nanArray[:] = np.nan
-
-    if site_id not in summary:
-
-        # define site based lists to store the correlation results in
-        summary[site_id] = {'median': deepcopy(nanArray), 'q25': deepcopy(nanArray),
-                               'q75': deepcopy(nanArray),
-                               'IQR': deepcopy(nanArray),
-                               'hrs': hrs}
+        summary[site_id] = {'median': deepcopy(nanArray), 'q25': deepcopy(nanArray),'q75': deepcopy(nanArray),
+                               'IQR': deepcopy(nanArray), 'mean': deepcopy(nanArray), 'stdev': deepcopy(nanArray),
+                                'hrs': hrs}
 
     return summary
 
@@ -232,29 +203,7 @@ def nearest_heights(mod_height, obs_height, minHeight=-np.inf, maxHeight=np.inf)
     return obs_hc_unique_pairs, mod_hc_unique_pairs, \
            pairs_hc_unique_values, pairs_hc_unique_diff
 
-def summary_statistics_mean(stat_i, site_i, hr, stat_data_hr):
-
-    """
-    Calculate the summary statistics for this hour.
-    :param stat_i:
-    :param site_i:
-    :param hr:
-    :param stat_data_hr:
-    :return: stat_i
-    """
-
-    hridx = int(hr)
-
-    stat_i[site_i]['mean'][hridx] = np.nanmean(stat_data_hr)
-    stat_i[site_i]['stdev'][hridx] = np.nanstd(stat_data_hr)
-
-    stat_i[site_i]['mean_minus_stdev'][hridx] = stat_i[site_i]['mean'][hridx] - stat_i[site_i]['stdev'][hridx]
-    stat_i[site_i]['mean_plus_stdev'][hridx] = stat_i[site_i]['mean'][hridx] + stat_i[site_i]['stdev'][hridx]
-
-
-    return stat_i
-
-def summary_statistics_med(stat_i, site_i, site_stats_i):
+def summary_statistics(stat_i, site_i, site_stats_i):
 
     """
     Calculate the summary statistics for this hour.
@@ -272,6 +221,8 @@ def summary_statistics_med(stat_i, site_i, site_stats_i):
         hridx = int(hr)
 
         stat_i[site_i]['median'][hridx] = deepcopy(np.nanmedian(stat_data_hr))
+        stat_i[site_i]['mean'][hridx] = np.nanmean(stat_data_hr)
+        stat_i[site_i]['stdev'][hridx] = np.nanstd(stat_data_hr)
 
         nanFree = np.array(deepcopy(stat_data_hr))[~np.isnan(np.array(deepcopy(stat_data_hr)))]
 
@@ -330,7 +281,7 @@ def plot_corr(stat, savedir, site_bsc_colours, model_type, extra=''):
     plt.tight_layout()
 
     plt.savefig(savedir +'correlations/' +
-                      model_type + '_SpearCorrTs_' + 'clearDaysSample_med_IQR_' +
+                      model_type + '_SpearCorrTs_' + '4clearDaysSample_med_IQR_' +
                       extra + '.png')  # filename
 
 
@@ -412,7 +363,7 @@ def plot_MAE(stat, savedir, site_bsc_colours, model_type, extra=''):
     fig = plt.figure(figsize=(6, 3.5))
     ax = plt.subplot2grid((1, 1), (0, 0))
 
-    for site, site_summary in stat.iteritems():
+    for site, site_summary in MAE.iteritems():
 
         # median
         ax.plot(site_summary['hrs'], site_summary['median'],
@@ -437,6 +388,100 @@ def plot_MAE(stat, savedir, site_bsc_colours, model_type, extra=''):
                       model_type + '_hourly_composite_' + 'clearDaysSample_med_IQR_' +
                       extra + '.png')  # filename
 
+
+    return fig
+
+def plot_AE_med(stat, savedir, site_bsc_colours, model_type, extra=''):
+
+    """
+    Plot the median and IQR of the MAE
+    :return:
+    """
+
+    fig = plt.figure(figsize=(6, 3.5))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+
+    for site, site_summary in AE.iteritems():
+
+        # median
+        ax.plot(site_summary['hrs'], site_summary['median'],
+                label=site, linewidth=1, ls='--', color=site_bsc_colours[site])
+
+        # shade IQR (25th - 75th percentile)
+        ax.fill_between(site_summary['hrs'], site_summary['q25'], site_summary['q75'],
+                        alpha=0.2, facecolor=site_bsc_colours[site])
+
+    # get number of samples in each hour and position where to plot them (the x values!)
+    n = [len(statistics['MR']['AE'][str(i)]) for i in range(24)]
+    pos = range(24)
+
+    # add sample size at the top of plot for each box and whiskers
+    # pos_t = np.arange(numBoxes) + 1
+    upperLabels = [str(np.round(n_i, 2)) for n_i in n]
+    weights = ['bold', 'semibold']
+    y_lim_max = ax.get_ylim()[1]
+    for tick in range(len(pos)):
+        k = tick % 2
+        ax.text(pos[tick], y_lim_max + (y_lim_max * 0.02), upperLabels[tick],
+                 horizontalalignment='center', size='x-small')
+    ax2 = ax.twiny()
+    ax2.set_xlim([0.0, 23.0])
+    ax2.xaxis.set_ticklabels([])
+
+    # # prettify
+    # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
+    ax.set_xlim(ax2.get_xlim())
+    # ax.set_ylim([-0.5, 1])
+    ax.set_xlabel('Time [HH]')
+    ax.set_ylabel(r'$Absolute \/\/Error\/\/\/ \mathrm{(|\beta_m - \beta_o|)}$')
+    ax.legend(loc='best', fontsize=8)
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+    # fig.suptitle('median and IQR')
+    plt.tight_layout()
+
+    plt.savefig(savedir +'ae/' +
+                      model_type + '_hourly_composite_' + '4clearDaysSample_med_IQR_' +
+                      extra + '_new.png')  # filename
+
+
+    return fig
+
+def plot_AE_mean(stat, savedir, site_bsc_colours, model_type, extra=''):
+
+    """
+    Plot the median and IQR of the MAE
+    :return:
+    """
+
+    fig = plt.figure(figsize=(6, 3.5))
+    ax = plt.subplot2grid((1, 1), (0, 0))
+
+    for site, site_summary in AE.iteritems():
+
+        # median
+        ax.plot(site_summary['hrs'], site_summary['mean'],
+                label=site, linewidth=1, ls='--', color=site_bsc_colours[site])
+
+        # shade IQR (25th - 75th percentile)
+        ax.fill_between(site_summary['hrs'],
+                        site_summary['mean'] - site_summary['stdev'],
+                        site_summary['mean'] + site_summary['stdev'],
+                        alpha=0.2, facecolor=site_bsc_colours[site])
+
+    # # prettify
+    # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
+    ax.set_xlim([0.0, 23.0])
+    # ax.set_ylim([-0.5, 1])
+    ax.set_xlabel('Time [HH]')
+    ax.set_ylabel(r'$Absolute \/\/Error\/\/\/ \mathrm{(|\beta_m - \beta_o|)}$')
+    ax.legend(loc='best', fontsize=8)
+    ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+    # fig.suptitle('median and IQR')
+    plt.tight_layout()
+
+    plt.savefig(savedir +'ae/' +
+                      model_type + '_hourly_composite_' + '4clearDaysSample_mean_1stdev_' +
+                      extra + '.png')  # filename
 
     return fig
 
@@ -472,24 +517,21 @@ if __name__ == '__main__':
      'CL31-C_MR': 4.5,
      'CL31-D_NK': 3.8000000000000007}
 
-    # day list
-    # full list (inc. 2017)
-    #daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-    #              '20161129', '20161130', '20161204', '20170120', '20170122', '20170325', '20170408']
-
-    # original before went on break
-    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-    #              '20161129']
-
-    # # true list (5 Feb 2015 - 31 Dec 2016)
+    # # # true list (5 Feb 2015 - 31 Dec 2016)
     # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
     #               '20161129', '20161130', '20161204']
 
-    # true list (5 Feb 2015 - 31 Dec 2016) without 11th June (very high region of RH, near surface in the morning)
-    daystrList = ['20150414', '20150415', '20150421', '20160504', '20160823', '20160911', '20161125',
-                  '20161129', '20161130', '20161204']
+    # # true list + 19/01/16 case
+    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160119', '20160504', '20160823', '20160911',
+    #               '20161125', '20161129', '20161130', '20161204']
 
-    # daystrList = ['20160504', '20160505']
+    # main list (5 Feb 2015 - 31 Dec 2016) without 11th June (very high region of RH, near surface in the morning)
+    #daystrList = ['20150414', '20150415', '20150421', '20160504', '20160823', '20160911', '20161125',
+    #              '20161129', '20161130', '20161204']
+
+    # # days when KSS45W, RGS, MR and NK all had data
+    daystrList = ['20150414', '20150415', '20150421', '20160119']
+    # # daystrList = ['20160119']
 
     days_iterate = dateList_to_datetime(daystrList)
 
@@ -503,14 +545,15 @@ if __name__ == '__main__':
     stats_diff = True # Currently calib is turned off!
     stats_RMSE = True # Currently calib is turned off!
 
-    # correlation max height
-    corr_max_height = 2000
+    # reduce MLH so it is safely within the BL across ALL ceilometers and not just MR? [%]
+    reduce_MLH = 10.0
 
     # define statistics dictionary
     statistics = {}
     corr = {}
     diff = {}
     MAE = {}
+    AE = {}
     rmse = {}
     sampleSize = {}
 
@@ -596,6 +639,9 @@ if __name__ == '__main__':
                 # for each hour possible in the day
                 for t, MLH_i in zip(np.arange(0, 24), mlh):
 
+                    # reduce MLHby a percentage based on reduce_MLH defined in the Setup
+                    MLH_i -= ((MLH_i/100.0)*reduce_MLH)
+
                     hr = str(t)
 
                     # pairs below the MLH height at this time
@@ -634,9 +680,10 @@ if __name__ == '__main__':
 
                     if stats_diff == True:
 
-                        # statistics[site_id]['diff'][hr] += [np.nanmedian(np.log10(mod_y) - np.log10(obs_x))]
-                        statistics[site_id]['diff'][hr] += [np.nanmedian(obs_x / mod_y)]
+                        statistics[site_id]['diff'][hr] += list(mod_y - obs_x)
+                        # statistics[site_id]['diff'][hr] += [np.nanmedian(obs_x / mod_y)]
                         statistics[site_id]['MAE'][hr] += [np.nanmean([np.abs(mod_y - obs_x)])]
+                        statistics[site_id]['AE'][hr] += list(np.abs(mod_y - obs_x))
                         # statistics[site_id]['diff'][hr] += [np.nanmean(np.log10(mod_y) - np.log10(obs_x))]
 
                     if stats_RMSE == True:
@@ -644,15 +691,23 @@ if __name__ == '__main__':
                         # statistics[site_id]['RMSE'][hr] += [eu.rmse(np.log10(mod_y), np.log10(obs_x))]
                         statistics[site_id]['RMSE'][hr] += [eu.rmse(mod_y, obs_x)]
 
+    # # check to see sample size
+    # for h in statistics[site_id]['AE'].iterkeys():
+    #     print h
+    #     print 'n =' + str(len(statistics[site_id]['AE'][h]))
+    #     print ''
+
     # gather up statistics...
     # create a mean and standard deviation for each hour for plotting
 
     print '\n' + 'Gathering statistics...'
 
-    # corr = {}
-    # diff = {}
-    # rmse = {}
-    # sampleSize = {}
+    corr = {}
+    diff = {}
+    rmse = {}
+    MAE={}
+    AE={}
+    sampleSize = {}
 
     for site_i, site_stats in statistics.iteritems():
 
@@ -660,32 +715,37 @@ if __name__ == '__main__':
 
         # setup site within the summary statistics and carry out statistics
         if stats_corr == True:
-            corr = create_stats_summary_dict_med(site_i, corr)
-            corr = summary_statistics_med(corr, site_i, site_stats['r'])
+            corr = create_stats_summary_dict(site_i, corr)
+            corr = summary_statistics(corr, site_i, site_stats['r'])
         if stats_RMSE == True:
-            rmse = create_stats_summary_dict_med(site_i, rmse)
-            rmse = summary_statistics_med(rmse, site_i, site_stats['RMSE'])
+            rmse = create_stats_summary_dict(site_i, rmse)
+            rmse = summary_statistics(rmse, site_i, site_stats['RMSE'])
         if stats_diff == True:
-            diff = create_stats_summary_dict_med(site_i, diff)
-            diff = summary_statistics_med(diff, site_i, site_stats['diff'])
+            diff = create_stats_summary_dict(site_i, diff)
+            diff = summary_statistics(diff, site_i, site_stats['diff'])
 
-            MAE = create_stats_summary_dict_med(site_i, MAE)
-            MAE = summary_statistics_med(diff, site_i, site_stats['MAE'])
+            MAE = create_stats_summary_dict(site_i, MAE)
+            MAE = summary_statistics(MAE, site_i, site_stats['MAE'])
 
+            AE = create_stats_summary_dict(site_i, AE)
+            AE = summary_statistics(AE, site_i, site_stats['AE'])
     # plot!
-    extra='73mtoNewMLH_N04461'
+    extra='73mtoNewMLH_minus'+str(int(reduce_MLH)) +'pct'
 
     if stats_corr == True:
         fig = plot_corr(corr, savedir, site_bsc_colours, model_type, extra=extra)
     if stats_RMSE == True:
         fig = plot_rmse(rmse, savedir, site_bsc_colours, model_type, extra=extra)
     if stats_diff == True:
+
         fig = plot_diff(diff, savedir, site_bsc_colours, model_type, extra=extra)
 
         # plot MAE in corr style
         fig = plot_MAE(MAE, savedir, site_bsc_colours, model_type, extra=extra)
 
-
+        # plot AE in corr style
+        fig = plot_AE_med(AE, savedir, site_bsc_colours, model_type, extra=extra)
+        fig = plot_AE_mean(AE, savedir, site_bsc_colours, model_type, extra=extra)
 
 
     plt.close('all')
