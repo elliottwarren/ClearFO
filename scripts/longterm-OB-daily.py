@@ -431,7 +431,6 @@ def plot_AE_med(stat, savedir, site_bsc_colours, model_type, extra=''):
     # # prettify
     # # fig.suptitle(data['time'][0].strftime("%Y%m%d") + '-' + data['time'][-1].strftime("%Y%m%d"), fontsize=12)
     ax.set_xlim(ax2.get_xlim())
-    # ax.set_ylim([-0.5, 1])
     ax.set_xlabel('Time [HH]')
     ax.set_ylabel(r'$Absolute \/\/Error\/\/\/ \mathrm{(|\beta_m - \beta_o|)}$')
     ax.legend(loc='best', fontsize=8)
