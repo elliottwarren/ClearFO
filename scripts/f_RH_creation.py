@@ -5,7 +5,11 @@ Created by Elliott 06/02/2017
 """
 
 import numpy as np
+from scipy.optimize import curve_fit
+from scipy import interpolate
+from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+import matplotlib
 
 def read_spec_bands(file_path):
 
@@ -167,7 +171,7 @@ def calc_f_RH(data, aer_order, Q_type=''):
 
     return Q, f_RH
 
-def main():
+if __name__ == '__main__':
 
     # User set args
     # band that read_spec_bands() uses to find the correct band
@@ -186,7 +190,7 @@ def main():
 
     # file_name = 'spec3a_sw_hadgem1_7lean_so' # original file given to me by Claire Ryder 25/01/17
     # file_name = 'sp_sw_ga7' # current UM file
-    # file_name = 'sp_ew_910' # my own made file with 1 band at 910 nm
+    # file_name = 'sp_ew_ceil_905'
     file_name = 'sp_895-915_r1.1e-7_stdev1.6_num8.0e9_salt8.0e-6'
     # file_name = 'sp_908-912_r1.1e-7_stdev1.6_num8.0e9' # 6 different aerosols inc. salt, biogenic and soot
     file_path = specdir + file_name
@@ -202,6 +206,11 @@ def main():
     elif file_name == 'sp_895-915_r1.1e-7_stdev1.6_num8.0e9_salt8.0e-6':
         aer_index = {'Ammonium Sulphate': 1, 'Generic NaCl': 2, 'Biogenic': 3, 'Aged fossil-fuel OC': 4, 'Ammonium nitrate': 5}
         aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Biogenic', 'Aged fossil-fuel OC', 'Ammonium nitrate']
+    elif file_name == 'sp_ew_ceil_905':
+        aer_index = {'Ammonium Sulphate': 1, 'Generic NaCl': 2, 'Biogenic': 3, 'Aged fossil-fuel OC': 4,
+                     'Ammonium nitrate': 5}
+        aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Biogenic', 'Aged fossil-fuel OC', 'Ammonium nitrate']
+
     else:
         aer_index = {'Ammonium Sulphate': 2, 'Generic NaCl': 3, 'Biogenic': 4, 'Aged fossil-fuel OC': 5, 'Ammonium nitrate': 6}
         aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Biogenic', 'Aged fossil-fuel OC', 'Ammonium nitrate']
@@ -233,6 +242,29 @@ def main():
 
     # calculate f(RH)
     Q, f_RH = calc_f_RH(data, aer_order, Q_type=Q_type)
+
+
+
+    # # interpolate f(RH) to increase resolution from 5% to 0.1%
+    # # fit binomial
+    # # m = np.polyfit(RH*100.0, f_RH_5['Generic NaCl'], 3)
+    # tck = interpolate.splrep(RH*100.0, f_RH_5['Generic NaCl'], s=1)
+    # ynew = interpolate.splev(np.arange(101), tck, der=0)
+    #
+    # (A, B), covvariances = curve_fit(lambda t, a, b: a * np.exp(b * t), RH[6:]*100.0, f_RH_5['Generic NaCl'][6:], p0=(2, 0.2))
+    # f = interp1d(RH*100.0, f_RH_5['Generic NaCl'], kind='cubic') # output is a function
+    # f2 = interp1d(RH * 100.0, f_RH_5['Generic NaCl'], kind='quadratic')
+
+    # plot binomial
+    #plt.plot(np.arange(101), ynew, label='cubic spline')
+    #plt.plot(np.arange(101), (m[0] * (np.arange(101)**3)) + (m[1] * (np.arange(101)**2)) + (m[2]*(np.arange(101)**1)) + (m[3]), label='2deg')
+    # plt.plot(np.arange(101), (m[0] * (np.arange(101)**5)) + (m[1]*(np.arange(101)**4)) + (m[2]*(np.arange(101)**3)) +
+    #                          (m[3] * (np.arange(101) ** 2)) + (m[4] * (np.arange(101))) + m[5], label='5deg')
+    #plt.plot(np.arange(101), A*np.exp(np.arange(101)*B), label='exp')
+    #plt.plot(np.arange(101), f(np.arange(101)), label='interp1d cubic')
+    #plt.plot(np.arange(101), f2(np.arange(101)), label='quadratic')
+    # plt.plot(RH*100, f_RH['Generic NaCl'], label='orig')
+    # plt.legend()
 
     # add a soot f_RH
     f_RH['Soot'] = [1.0 for i in f_RH['Generic NaCl']]
@@ -269,7 +301,7 @@ def main():
 
     for key, value in data.iteritems():
 
-        plt.plot(RH*100, f_RH[key], label=key, linestyle='--')
+        plt.plot(RH*100, f_RH[key], label=key, linestyle='-')
 
     # plt.plot(value[:, 0], f_RH['average with Aitken Sulphate'], label='average with Aitken Sulphate', linestyle='-')
 
@@ -278,20 +310,18 @@ def main():
     plt.plot(RH*100, f_RH['MURK'], label='MURK', color='black')
 
     # plot soot as a constant until I get f(RH) for it
-    plt.plot([0.0, 100.0], [1.0, 1.0], label='Soot')
+    plt.plot([0.0, 100.0], [1.0, 1.0], label='Black carbon')
 
-
-    plt.legend(fontsize=9, loc='best')
-    plt.xlabel('RH [%]', labelpad=0)
+    plt.legend(fontsize=10, loc='best')
+    plt.tick_params(axis='both', labelsize=11)
+    plt.xlabel('RH [%]', labelpad=0, fontsize=11)
     # plt.ylabel(Q_type + ' f(RH)')
-    plt.ylabel(r'$f_{ext}$')
+    plt.ylabel(r'$f_{ext,rh}$', fontsize=11)
     plt.ylim([0.0, 8.0])
     plt.xlim([0.0, 100.0])
-    plt.title(file_name + ': ' + band_lam_range + ' band')
+    # plt.title(file_name + ': ' + band_lam_range + ' band')
+
     plt.tight_layout() # moved tight_layout above... was originally after the save (06/04/17)
     plt.savefig(savedir + file_name + '_' + Q_type[0:3] + '_f_RH_all_' + band_lam_range + '_salt8.0.png')
 
-
-
-if __name__ == '__main__':
-    main()
+    print 'END PROGRRAM'
