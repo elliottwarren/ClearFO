@@ -41,8 +41,8 @@ def main():
     site_bsc_colours = FOcon.site_bsc_colours
 
     # day start and end
-    dayStart = dt.datetime(2015, 04, 20)
-    dayEnd = dt.datetime(2015, 04, 21)
+    dayStart = dt.datetime(2016, 01, 19)
+    dayEnd = dt.datetime(2016, 01, 19)
 
 
     # ==============================================================================
@@ -65,7 +65,7 @@ def main():
         # extract MURK aerosol and calculate RH for each of the sites in the ceil metadata
         # (can be different locations to sites_bsc)
         # reads all london model data, extracts site data, stores in single dictionary
-        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res)
+        mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910, version=0.2)
 
         # 2. Read ceilometer
         # -----------------------
@@ -87,13 +87,15 @@ def main():
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 4))
 
             # obs
-            mesh1, ax1 = ceil.ceil_plot_to_ax(bsc_obs[site], ax1,
+            mesh1, ax1 = ceil.ceil_plot_to_ax(bsc_obs[site]['height'], bsc_obs[site]['time'],
+                                              bsc_obs[site]['backscatter'], ax1,
                             hmax=2000, vmin=1e-7, vmax=5e-6,
                             tmin=day, tmax=day+dt.timedelta(days=1))
 
             # model
             mod_data[site_id]['height'] = mod_data[site_id]['level_height']
-            mesh2, ax2 = ceil.ceil_plot_to_ax(mod_data[site_id], ax2,
+            mesh2, ax2 = ceil.ceil_plot_to_ax(mod_data[site_id]['height'] ,mod_data[site_id]['time'],
+                                              mod_data[site_id]['backscatter'], ax2,
                             hmax=2000, vmin=1e-7, vmax=5e-6,
                             tmin=day, tmax=day + dt.timedelta(days=1))
 

@@ -399,7 +399,7 @@ if __name__ == '__main__':
         interp_f_RH_i['Soot'] = np.repeat(1.0, 101)
         f_RH['CBLK'][array_idx, :] = interp_f_RH_i['Soot']
 
-        # all species excluding soot
+        # boost RH resolution (soot already boosted)
         for species_i, chem_i in aer_particles_chem.iteritems():
             f = interp1d(RH, f_RH_i[species_i], kind='linear')
             interp_f_RH_i[species_i] = f(RH_int)

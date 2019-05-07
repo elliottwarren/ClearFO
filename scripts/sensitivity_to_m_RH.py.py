@@ -11,7 +11,6 @@ Edited by Elliott Warren - 28/04/2017
 
 import numpy as np
 import matplotlib.pyplot as plt  # plotting library (not Met Office)
-from decimal import Decimal
 from os.path import join
 
 from forward_operator import FOUtils as FO

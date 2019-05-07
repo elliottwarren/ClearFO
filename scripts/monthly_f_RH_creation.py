@@ -185,10 +185,12 @@ def calc_f_RH(data, aer_order, Q_type=''):
 # Saving
 
 def save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_nm_str):
+
     """
     Create a netCDF file for the f(RH) information to be stored in.
     :param fRHdir: dircetory to save netCDF file to (should ideally be the monthly f(RH) dir)
-    :param f_RH: f(RH) curves
+    :param f_RH: f(RH) curves: Dictionary variable, where keys are species and each element
+                is a [3D array] with .shape(month, radii, RH)
     :param radii_range_nm: needs to match the units if changed! [currently nm]
     :param RH_int: interpolated RH values [fraction]
     :param site_ins: site information
@@ -196,10 +198,12 @@ def save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_
     :return:
 
     Store the MURK [month, radius, RH] AND species f(RH) curves [radius, RH]
+    EW 03/2018
     """
 
     # create netCDF file
-    ncfile = Dataset(fRHdir + 'monthly_f(RH)_' + site_ins['site_short'] + '_' + ceil_lambda_nm_str + '.nc', 'w')
+    filepath = fRHdir + 'monthly_f(RH)_' + site_ins['site_short'] + '_' + ceil_lambda_nm_str + '.nc'
+    ncfile = Dataset(filepath, 'w')
 
     # create Dimensions
     ncfile.createDimension('month', len(np.arange(1, 13)))
@@ -207,9 +211,9 @@ def save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_
     ncfile.createDimension('radii_range', len(radii_range_nm))
 
     # create, fill and set units for co-ordinate variables
-    nc_month = ncfile.createVariable('months', np.float64, ('month',))
-    nc_RH = ncfile.createVariable('Relative Humidity', np.float64, ('RH',))
-    nc_radii_range_nm = ncfile.createVariable('radii_range_nm', np.float64, ('radii_range',))
+    nc_month = ncfile.createVariable('month', np.float64, ('month',))
+    nc_RH = ncfile.createVariable('RH', np.float64, ('RH',))
+    nc_radii_range_nm = ncfile.createVariable('radii_range', np.float64, ('radii_range',))
 
     nc_month[:] = np.arange(1, 13)
     nc_RH[:] = RH_int
@@ -235,6 +239,8 @@ def save_fRH_netCDF(fRHdir, f_RH, radii_range_nm, RH_int, site_ins, ceil_lambda_
 
     # close file
     ncfile.close()
+
+    print filepath + ' saved!'
 
     return
 
@@ -266,14 +272,15 @@ if __name__ == '__main__':
     # Setup
     # ------------------------------------------
     # site information
-    # site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
-    #             'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
+    site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
+                'ceil_lambda': 0.905e-06, 'land-type': 'urban', 'SOCRATES_file_subdir': 'stdev_1.70_NK',
+                'geo_stdev': '1.70'}
     # site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
     #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
-    site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
-                'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
+    # site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
+    #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
 
-    ceil_lambda_nm_str = str(site_ins['ceil_lambda'] * 1e9) + 'nm'
+    ceil_lambda_nm_str = str(int(site_ins['ceil_lambda'] * 1e9)) + 'nm'
 
     # User set args
     # band that read_spec_bands() uses to find the correct band
@@ -289,7 +296,7 @@ if __name__ == '__main__':
     savedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/figures/Mie/monthly_f(RH)/'
     fRHdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/monthly_f(RH)/'
     specdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/' \
-              'monthly_f(RH)/sp_885-925_r_files/'
+              'SOCRATES/'+site_ins['SOCRATES_file_subdir']+'/'
     pickleloaddir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/pickle/'
 
 
@@ -306,13 +313,14 @@ if __name__ == '__main__':
 
     month_colours = {'blue': [1, 2, 12], 'green': [3, 4, 5], 'red': [6, 7, 8], 'orange': [9, 10, 11]}
     month_ls = {'-': [1, 4, 7, 10], '--': [2, 5, 8, 11], '-.': [12, 3, 6, 9]}
+
     # Q type to use in calculating f(RH)
     Q_type = 'extinction'
     print 'Q_type = ' + Q_type
 
     # range of colours (0.1 % resolution)
     # res = 1000
-    cmap = cm.winter
+    cmap = cm.coolwarm
     # colours = cm.jet(np.linspace(0, 1, res))
     # norm = mpl.colors.Normalize(vmin=0, vmax=100)
 
@@ -329,9 +337,10 @@ if __name__ == '__main__':
     pm10_rel_vol = pickle_load_in['pm10_rel_vol']
 
     # range of radii to iterate over
-    radii_range_m = np.arange(0.005e-06, 3.685e-6 + 0.005e-06, 0.005e-06)
-    radii_range_micron = np.arange(0.005, 3.685 + 0.005, 0.005)
-    radii_range_nm = np.arange(5, 3685 + 5, 5)
+    # radii_range_m = np.arange(0.005e-06, 3.685e-6 + 0.005e-06, 0.005e-06)
+    radii_range_m = np.arange(0.005e-06, 7.720e-06 + 0.005e-06, 0.005e-06)
+    radii_range_micron = np.arange(0.005, 7.720 + 0.005, 0.005)
+    radii_range_nm = np.arange(5, 7720 + 5, 5)
 
     # RH to interpolate to
     RH_int = np.arange(0, 1.01, 0.01)
@@ -349,14 +358,14 @@ if __name__ == '__main__':
 
     for radius_idx, radius_nm_i in enumerate(radii_range_nm):
 
-        print radius_idx
+        print radius_nm_i
 
         # format of radius used in the filename
         #   trying to use m or microns leads to rounding errors when making the string...
         radius_filestr = '0.%09d' % radius_nm_i
 
         # create filename
-        filename = 'sp_885-925_r'+radius_filestr+'_stdev1.6_num4.461e9'
+        filename = 'sp_885-925_r'+radius_filestr+'_stdev'+site_ins['geo_stdev']+'_num4.461e9'
         file_path = specdir + filename
 
         # read in the spectral band information

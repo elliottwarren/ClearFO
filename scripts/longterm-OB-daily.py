@@ -511,7 +511,7 @@ if __name__ == '__main__':
     site_aer = FOcon.site_aer
     site_bsc_colours = FOcon.site_bsc_colours
 
-    site_bsc = {'CL31-A_KSS45W': 64.3,
+    site_bsc = {'CL31-A_KSS45W': 64.3 - 31.4,
      'CL31-B_RGS': 8.700000000000003,
      'CL31-C_MR': 4.5,
      'CL31-D_NK': 3.8000000000000007}

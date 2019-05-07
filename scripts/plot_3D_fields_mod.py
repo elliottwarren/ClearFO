@@ -86,8 +86,6 @@ def plot_time_height_cross(site, mod_all_data, CSAT3, model_type, Z, day, idx_lo
 
     divider = make_axes_locatable(ax4)
     cax2 = divider.append_axes("right", size="5%", pad=0.05)
-    #cb = plt.colorbar(mesh3, cax=cax2)
-    #cb.remove()
     cax2.axis('off')
 
     # plt.suptitle(site + ': ' + str(day) + ' units: m s-1')
@@ -144,7 +142,6 @@ def lin_interpolate_u_v_to_bgrid(mod_all_data, rotpole, ll, rotlat2D, rotlon2D):
 
     return cutlon2d, cutlat2d, cutaer, y_wind_conv, x_wind_conv
 
-
 def plot_2D_wind(mod_all_data, ceil_metadata, model_type, res, savedir, Z, t, h_levels, lons, lats):
 
     for h in np.arange(h_levels):
@@ -200,65 +197,70 @@ def plot_2D_wind(mod_all_data, ceil_metadata, model_type, res, savedir, Z, t, h_
 
     return
 
-def plot_2D_wind_b_grid(mod_all_data, model_type, ceil_metadata, savedir, Z, t, h_levels, x_wind_conv, y_wind_conv, cutlon2d, cutlat2d, cutaer):
+def plot_2D_wind_b_grid(mod_all_data, model_type, ceil_metadata, savedir, Z, t_levels, h_levels, x_wind_conv, y_wind_conv, cutlon2d, cutlat2d, cutaer):
 
-    for h in np.arange(h_levels):
-        # plot 2D fields at fixed time and height of area over London
-        fig, ax = plt.subplots(1, 1, figsize=(5, 4.4))
+    """
+    Plot the 2D wind field for each height and time given
+    """
 
-        # ----------- NOTE! ----------------------
-        # current issue is that x_wind has shape (14,12) whereas longitude is (15) not (14)...
-        # would need to trim off of y wind and longitude... but which side to trim; do I trim the start or end?
+    # make h_levels and t_levels iterable
+    if type(h_levels) != list:
+        h_levels = [h_levels]
 
-        # make ure aerosol is transposed, as it needs shape (latitude, longitude) because it is (rows, columns), (y, x)
-        # it WILL plot if rows and columns are the wrong way round AND if the wrong shape!
-        # height[11] = 555 m; time[15] = 15:00.  '4D variable'[time, height, lat, lon]
+    if type(t_levels) != list:
+        t_levels = [t_levels]
 
-        # quiv = ax.quiver(mod_all_data['longitude'][:-1], mod_all_data['latitude'],
-        #                  mod_all_data['x_wind'][t, h, :, :], mod_all_data['y_wind'][t, h, :, :-1],
-        #                  np.transpose(mod_all_data['aerosol_for_visibility'][t, h, :, :-1]),
-        #                  units='width', clim=[10.0, 80.0])
+    for t in t_levels:
 
-        quiv = ax.quiver(cutlon2d, cutlat2d, x_wind_conv[t, h, :, :], y_wind_conv[t, h, :, :],
-                         np.transpose(cutaer[t, h, :, :]),
-                         units='width', clim=[10.0, 80.0])
+        for h in h_levels:
+            # plot 2D fields at fixed time and height of area over London
+            fig, ax = plt.subplots(1, 1, figsize=(5.2, 4.4))
 
-        # plt.axis('equal')
+            # ----------- NOTE! ----------------------
+            # current issue is that x_wind has shape (14,12) whereas longitude is (15) not (14)...
+            # would need to trim off of y wind and longitude... but which side to trim; do I trim the start or end?
 
-        plt.colorbar(quiv)
-
-
+            # make ure aerosol is transposed, as it needs shape (latitude, longitude) because it is (rows, columns), (y, x)
+            # it WILL plot if rows and columns are the wrong way round AND if the wrong shape!
+            # height[11] = 555 m; time[15] = 15:00.  '4D variable'[time, height, lat, lon]
 
 
-        #plot each ceilometer location
-        for site, loc in ceil_metadata.iteritems():
-            # idx_lon, idx_lat, glon, glat = FO.get_site_loc_idx_in_mod(mod_all_data, loc, model_type, res)
-            plt.scatter(loc[0], loc[1], color='black')
-            plt.annotate(site, (loc[0], loc[1]))
+            quiv = ax.quiver(cutlon2d, cutlat2d, x_wind_conv[t, h, :, :], y_wind_conv[t, h, :, :],
+                             np.transpose(cutaer[t, h, :, :]),
+                             units='width', clim=[10.0, 80.0])
 
-            # prettify
-            # ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
-            # ax.yaxis.label.set_size(10)
-            # ax.xaxis.label.set_size(10)
-            # ax.set_xlim([day, day + dt.timedelta(days=1)])
-            # ax.set_ylim([0, 1500.0])
+            plt.colorbar(quiv)
 
-            # divider = make_axes_locatable(ax)
-            # cax = divider.append_axes("right", size="5%", pad=0.05)
-            # plt.colorbar(mesh, cax=cax)
 
-        ax.set_xlabel(r'$Longitude$')
-        ax.set_ylabel(r'$Latitude$')
+            #plot each ceilometer location
+            for site, loc in ceil_metadata.iteritems():
+                # idx_lon, idx_lat, glon, glat = FO.get_site_loc_idx_in_mod(mod_all_data, loc, model_type, res)
+                plt.scatter(loc[0], loc[1], facecolors='none', edgecolors='black')
+                plt.annotate(site, (loc[0], loc[1]))
 
-        # plt.suptitle(str(mod_all_data['time'][t]) + ' height: ' + str(mod_all_data['level_height'][h]) + ' m')
+                # prettify
+                # ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
+                # ax.yaxis.label.set_size(10)
+                # ax.xaxis.label.set_size(10)
+                # ax.set_xlim([day, day + dt.timedelta(days=1)])
+                # ax.set_ylim([0, 1500.0])
 
-        plt.tight_layout(pad=3)
-        qk = plt.quiverkey(quiv, 0.8, 0.93, 2, r'$2 \frac{m}{s}$', labelpos='E',
-                           coordinates='figure')
+                # divider = make_axes_locatable(ax)
+                # cax = divider.append_axes("right", size="5%", pad=0.05)
+                # plt.colorbar(mesh, cax=cax)
 
-        plt.savefig(savedir + '2DwindFields/v3_' + model_type + '_2Dfield_' +
-                    mod_all_data['time'][t].strftime('%Y%m%d_%Hhr') + '_' + str(Z) + 'Z' + '_' +
-                    str(mod_all_data['level_height'][h]) + 'm.png')  # filename
+            ax.set_xlabel(r'$Longitude$')
+            ax.set_ylabel(r'$Latitude$')
+
+            # plt.suptitle(str(mod_all_data['time'][t]) + ' height: ' + str(mod_all_data['level_height'][h]) + ' m')
+
+            plt.tight_layout(pad=3)
+            qk = plt.quiverkey(quiv, 0.8, 0.93, 2, r'$2 \frac{m}{s}$', labelpos='E',
+                               coordinates='figure')
+
+            plt.savefig(savedir + '2DwindFields/v3_' + model_type + '_2Dfield_' +
+                        mod_all_data['time'][t].strftime('%Y%m%d_%Hhr') + '_' + str(Z) + 'Z' + '_' +
+                        str(mod_all_data['level_height'][h]) + 'm.png')  # filename
 
 
     return
@@ -353,33 +355,27 @@ def main():
     rhDatadir = datadir + 'L1/'
     aerDatadir = datadir + 'LAQN/'
 
-    # statistics to run
-    pm10_stats = False
-    rh_stats = True
+    # site_bsc = FOcon.site_bsc
+    # site_bsc_i = {'CL31-C_MR': 4.5}
+    # # main site for the u, v and w plot.
+    # main_site = 'MR'
+    # ceil_id = 'CL31-C'
+    # ceil_id_full = ceil_id + '_' + main_site
 
-
-    site_bsc = FOcon.site_bsc
-    site_bsc_i = {'CL31-C_MR': 4.5}
+    site_bsc_i = {'CL31-A_KSS45W': 64.3}
+    # main site for the u, v and w plot.
+    main_site = 'KSS45W'
+    ceil_id = 'CL31-A'
+    ceil_id_full = ceil_id + '_' + main_site
 
     site_bsc_colours = FOcon.site_bsc_colours
-
-    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-    #               '20161129', '20161130', '20161204']
-
-    # days_iterate = dateList_to_datetime(daystrList)
-
-    corr_max_height = 2000.0
 
     # forecast data start time
     Z='21'
 
-    # main site for the u, v and w plot.
-    main_site = 'MR'
-    ceil_id = 'CL31-C'
-    ceil_id_full = ceil_id + '_' + main_site
-
-    days_iterate = [dt.datetime(2016,01,19)]# new PM10 case study day
-    # day = [dt.datetime(2016, 05, 04)] # one of my old case study days
+    days_iterate = [dt.datetime(2016,01,19)]# PM10 case study day
+    # days_iterate = [dt.datetime(2016, 11, 30)]  # new PM10 case
+    # day = [dt.datetime(2016, 05, 04)] # one of my old case study days on a normal clear day
 
     # plot ?
     windfield = True # 2D wind field
@@ -458,8 +454,6 @@ def main():
         cutlon2d, cutlat2d, cutaer, y_wind_conv, x_wind_conv = \
             lin_interpolate_u_v_to_bgrid(mod_all_data, rotpole, ll,rotlat2D, rotlon2D)
 
-
-
         # get idx location for instrument
         idx_lon_main, idx_lat_main, _, _ = FO.get_site_loc_idx_in_mod(mod_all_data, loc, model_type, res)
 
@@ -473,8 +467,9 @@ def main():
         if windfield == True:
 
             # plot 2D wind fields
-            t = 21 # time slice
-            h_levels = 12 # number of height levels (will a plot for every level between 0 and h_levels)
+            t = range(21, 22) # time slice
+            #h_levels = [4] # number of height levels (will a plot for every level between 0 and h_levels)
+            h_levels = range(3, 4)
             # plot_2D_wind(mod_all_data, ceil_metadata, model_type, res, savedir, Z, t, h_levels, lons, lats)
             plot_2D_wind_b_grid(mod_all_data, model_type, ceil_metadata, savedir, Z, t, h_levels, x_wind_conv, y_wind_conv, cutlon2d, cutlat2d,
                             cutaer)
@@ -482,7 +477,7 @@ def main():
         if cloudcross == True:
 
             # cloud fraction time height cross section over main ceilometer site
-            plot_cloud_time_height_cross(mod_all_data, cloud_obs['CL31-C_MR'], idx_lat_main, idx_lon_main, main_site, savedir,
+            plot_cloud_time_height_cross(mod_all_data, cloud_obs[ceil_id_full], idx_lat_main, idx_lon_main, main_site, savedir,
                                          model_type, Z, day)
 
     return

@@ -1,5 +1,5 @@
 """
-Compare the monthly climatology of f(RH) between sites
+Compare the climatology of f(RH) between sites
 
 Created by Elliott Mon 05/03/2018
 Based on monthly_f_RH_creation.py
@@ -23,8 +23,7 @@ if __name__ == '__main__':
     # site information
     # site_ins = {'site_short': 'NK', 'site_long': 'North Kensington',
     #             'ceil_lambda': 0.905e-06, 'land-type': 'urban'}
-    site_ins = {'site_short':'Ch', 'site_long': 'Chilbolton',
-                'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
+    site_ins = {'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
     # site_ins = {'site_short':'Ha', 'site_long': 'Harwell',
     #             'ceil_lambda': 0.905e-06, 'land-type': 'rural'}
 
@@ -41,29 +40,31 @@ if __name__ == '__main__':
     # -------------------------
 
     # directories
-    savedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/figures/Mie/monthly_f(RH)/'
-    fRHdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/monthly_f(RH)/'
-    specdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/' \
-              'monthly_f(RH)/sp_885-925_r_files/'
+    savedir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/figures/Mie/daily_f(RH)/'
+    fRHdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/daily_f(RH)/'
+    # specdir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/' \
+    #           'monthly_f(RH)/sp_885-925_r_files/'
     pickleloaddir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/Mie/pickle/'
 
 
-    # variables to take from file (as listed within the file) with index from BLOCK = 0
-    # NOTE: data MUST be in ascending index order
-    aer_index = {'Ammonium Sulphate': 1, 'Generic NaCl': 2, 'Biogenic': 3, 'Aged fossil-fuel OC': 4,
-                 'Ammonium nitrate': 5}
-    aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Aged fossil-fuel OC', 'Ammonium nitrate']
+    # # variables to take from file (as listed within the file) with index from BLOCK = 0
+    # # NOTE: data MUST be in ascending index order
+    # aer_index = {'Ammonium Sulphate': 1, 'Generic NaCl': 2, 'Biogenic': 3, 'Aged fossil-fuel OC': 4,
+    #              'Ammonium nitrate': 5}
+    # aer_order = ['Ammonium Sulphate', 'Generic NaCl', 'Aged fossil-fuel OC', 'Ammonium nitrate']
+    #
+    # aer_particles_chem = {'Ammonium Sulphate': '(NH4)2SO4', 'Generic NaCl': 'NaCl', 'Aged fossil-fuel OC': 'CORG',
+    #                       'Ammonium nitrate': 'NH4NO3', 'Soot': 'CBLK'}
+    #
+    # aer_particles = ['(NH4)2SO4', 'NH4NO3', 'NaCl', 'CORG', 'CBLK']
 
-    aer_particles_chem = {'Ammonium Sulphate': '(NH4)2SO4', 'Generic NaCl': 'NaCl', 'Aged fossil-fuel OC': 'CORG',
-                          'Ammonium nitrate': 'NH4NO3', 'Soot': 'CBLK'}
+    # date resolution
+    dataRes = 'daily'
 
-    aer_particles = ['(NH4)2SO4', 'NH4NO3', 'NaCl', 'CORG', 'CBLK']
-
+    # Plotting different months
     month_colours = {'blue': [1, 2, 12], 'green': [3, 4, 5], 'red': [6, 7, 8], 'orange': [9, 10, 11]}
     month_ls = {'-': [1, 4, 7, 10], '--': [2, 5, 8, 11], '-.': [12, 3, 6, 9]}
-    # Q type to use in calculating f(RH)
-    Q_type = 'extinction'
-    print 'Q_type = ' + Q_type
+
 
     # ---------------------------------------------------
     # Read, Process and save f(RH)

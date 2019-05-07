@@ -51,6 +51,7 @@ def create_stats_entry(site_id, statistics={}):
         statistics[site_id] = {'r': [], 'p': [],
                                'diff': [],
                                'aer_diff': [],
+                               'aer_diff_normalsed_aer_obs': [],
                                'aer_mod': [],
                                'aer_obs': [],
                                'rh_diff': [],
@@ -58,6 +59,7 @@ def create_stats_entry(site_id, statistics={}):
                                'rh_obs': [],
                                'back_diff_log': [],
                                'back_diff_norm': [],
+                               'back_diff_norm_normalised_back_obs': [],
                                'abs_back_diff_log': [],
                                'abs_back_diff_norm': [],
                                'back_obs': [],
@@ -66,6 +68,7 @@ def create_stats_entry(site_id, statistics={}):
                                'MBE': [],
                                'hr': [],
                                'datetime':[]}
+
 
     return statistics
 
@@ -108,21 +111,40 @@ def get_nearest_ceil_mod_height_idx(mod_height, obs_height, ceil_gate_num):
 
     return ceil_gate_idx, mod_height_idx
 
-def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type, c_type='hr', extra=''):
+def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, sampleSize=np.nan, corr=np.nan,
+                         var_type=np.nan, c_type='rh_mod', savename='', extra=''):
 
     """
     Plot the rh or aer difference vs backscatter diff
     :return:
     """
 
+    # stats_site = statistics[site_id]
+    c_type = 'rh_mod'
+    var_type = 'aerosol'
+
+    # sample size for backscatter, aer and rh - help work out why some points don't show up
+    back_bool = ~np.isnan(np.array(stats_site['back_diff_norm']))
+    aer_bool = ~np.isnan(np.array(stats_site['aer_diff']))
+    rh_bool = ~np.isnan(np.array(stats_site['rh_mod']))
+
+    back_n = len(np.where(back_bool == True)[0])
+    aer_n = len(np.where(aer_bool == True)[0])
+    rh_n = len(np.where(rh_bool == True)[0])
+
+    bool = back_bool & aer_bool & rh_bool
+    sampleSize = len(np.where(bool == True)[0])
+
     # variable plotting against backscatter point diff
     if var_type == 'aerosol':
-        var_diff = stats_site['aer_diff']
+        # var_diff = stats_site['aer_diff']
+        var_diff = stats_site['aer_diff_normalsed_aer_obs']
     elif var_type == 'RH':
         var_diff = stats_site['rh_diff']
 
     # backscatter point difference
-    back_point_diff = stats_site['back_diff_norm']
+    # back_point_diff = stats_site['back_diff_norm']
+    back_point_diff = stats_site['back_diff_norm_normalised_back_obs']
     # back_point_diff = stats_site['back_diff_log']
 
     fig = plt.figure(figsize=(6, 3.5))
@@ -133,13 +155,18 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
         xlab = r'$Difference \/\mathrm{(RH_{ukv} - RH_{obs})}$'
 
     elif var_type == 'aerosol':
-        xlab = r'$Difference \/\mathrm{(m_{MURK} - PM_{10})}$'
+        xlab = r'$\frac{m_{MURK} - PM_{10}}{PM_{10}}}$'
+        #xlab = r'$Difference \/\mathrm{(m_{MURK} - PM_{10})}$'
+
+    c_min = 20
+    c_max = 100.0
 
     # define the colormap
-    cmap, norm = discrete_colour_map(40, 100, 13)
+    cmap, norm = discrete_colour_map(c_min, c_max, 17)
 
     # plot data
-    scat = plt.scatter(var_diff, back_point_diff, c=stats_site[c_type], s=6, vmin=40.0, vmax=100.0, cmap=cmap, norm=norm)
+    # scat = plt.scatter(var_diff, back_point_diff, c=stats_site[c_type], s=6, vmin=40.0, vmax=100.0, cmap=cmap, norm=norm)
+    scat = plt.scatter(var_diff, back_point_diff, c=stats_site[c_type], s=6, vmin=c_min, vmax=c_max, cmap=cmap, norm=norm)
 
     # add 0 lines
     ax.axhline(linestyle='--', color='grey', alpha=0.5)
@@ -151,14 +178,21 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = plt.colorbar(scat, cax=cax, norm=norm)
-    cbar.set_label(r'$RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
+    # cbar.set_label(r'$RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
+    cbar.set_label(r'$\mathrm{RH\/[\%]}$', labelpad=-36, y=1.075, rotation=0)
+    # cbar.set_label(r'$m\/[/mu g \/kg^{-1}]$', labelpad=-38, y=1.075, rotation=0)
 
 
     ax.set_xlabel(xlab)
-    ax.set_ylim([-1e-5, 1e-5])
+    # ax.set_ylim([-1e-5, 1e-5])
+    # ax.set_ylim([-6.0e-6, 6.0e-6]) # paper 1
+    # ax.set_ylim([-6.0e-5, 6.0e-5])
+    ax.set_ylim([-1.2, 15.0])
+    ax.set_xlim([-1.2, 6.0])
     # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
-    ax.set_ylabel(r'$Difference \/\mathrm{(\beta_m - \beta_o)}$')
-    ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+    # ax.set_ylabel(r'$Difference \/\mathrm{(\beta_m - \beta_o)}$')
+    ax.set_ylabel(r'$\frac{\beta_m - \beta_o}{\beta_o}}$')
+    #ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
 
     # Fake a ScalarMappable so I can display a colormap
     # cmap, norm = mcolors.from_levels_and_colors(range(24 + 1), rgb)
@@ -167,13 +201,17 @@ def plot_back_point_diff(stats_site, savedir, model_type, ceil_gate_num, ceil, s
     # fig.colorbar(sm)
     # plt.colorbar()
 
-    fig.suptitle(ceil + '; n = ' + str(sampleSize) + '; r = ' + '{:1.2f}'.format(corr['r']) +
-                 '; p = ' + '%1.2f' % corr['p'])
+    fig.suptitle('n='+str(sampleSize)+': back_n='+str(back_n)+'; aer='+str(aer_n)+' rh_n='+str(rh_n))
+    #fig.suptitle(ceil + '; n = ' + str(len(back_point_diff)) + '; r = ' + '{:1.2f}'.format(corr['r']) +
+    #             '; p = ' + '%1.2f' % corr['p'])
+
     plt.tight_layout()
     plt.subplots_adjust(top=0.90)
-    plt.savefig(savedir + 'point_diff/' +
-                model_type + '_' + var_type + '_diff_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '_c' + c_type +
-                '_' + extra + '.png')  # filename
+    if savename is '':
+        plt.savefig(savedir + model_type + '_' + var_type + '_diff_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '_c' + c_type +
+               '_' + extra + '.png')  # filename
+    else:
+        plt.savefig(savedir + savename + extra)
 
     plt.close(fig)
 
@@ -316,6 +354,8 @@ def discrete_colour_map(lower_bound, upper_bound, spacing):
 
     """Create a discrete colour map"""
 
+    import matplotlib.pyplot as plt
+
     cmap = plt.cm.jet
     # extract all colors from the .jet map
     cmaplist = [cmap(i) for i in range(cmap.N)]
@@ -343,7 +383,7 @@ if __name__ == '__main__':
     # directories
     maindir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/'
     datadir = maindir + 'data/'
-    savedir = maindir + 'figures/' + model_type + '/clearSkyPeriod/'
+    savedir = maindir + 'figures/' + model_type + '/clearSkyPeriod/point_diff/'
 
     # data
     ceilDatadir = datadir + 'L1/'
@@ -396,7 +436,7 @@ if __name__ == '__main__':
 
     # day list
     # clear sky days (5 Feb 2015 - 31 Dec 2016)
-    daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+    daystrList = ['20150414', '20150415', '20150421', '20150611', '20160119', '20160504', '20160823', '20160911', '20161125',
                   '20161129', '20161130', '20161204']
 
     if site == 'KSS45W':
@@ -405,8 +445,8 @@ if __name__ == '__main__':
 
     # MR calib days
     elif site == 'MR':
-        daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
-                      '20161129', '20161130', '20161204']
+        daystrList = ['20150414', '20150415', '20150421', '20150611', '20160119', '20160504', '20160823', '20160911',
+                      '20161125', '20161129', '20161130', '20161204'] # with 19/1/16
 
     # daystrList = ['20150414']
     elif site == 'NK':
@@ -431,6 +471,8 @@ if __name__ == '__main__':
     statistics = {}
     sampleSize = 0 # add to this
 
+    # aerFO run and bsc obs calibrate version number
+    version=1.0
 
     # ==============================================================================
     # Read data
@@ -452,7 +494,7 @@ if __name__ == '__main__':
 
         # extract MURK aerosol and calculate RH for each of the sites in the ceil metadata
         # reads all london model data, extracts site data, stores in single dictionary
-        mod_data = FO.mod_site_extract_calc(day, ceil_data_i, modDatadir, model_type, res, 910, version=0.2, allvars=True)
+        mod_data = FO.mod_site_extract_calc(day, ceil_data_i, modDatadir, model_type, res, 910, version=version, allvars=True)
 
         # mod_data_all = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910, version=0.2, allvars=True)
 
@@ -461,7 +503,7 @@ if __name__ == '__main__':
 
         # will only read in data is the site is there!
         # ToDo Remove the time sampling part and put it into its own function further down.
-        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=True)
+        bsc_obs = FO.read_ceil_obs(day, site_bsc, ceilDatadir, mod_data, calib=True, version=version)
 
 
         if pm10_stats == True:
@@ -546,6 +588,7 @@ if __name__ == '__main__':
                 # such that their idx positions line up
                 if pm10_stats == True:
                     statistics[site_id]['aer_diff'] += [murk_i - pm10_i]
+                    statistics[site_id]['aer_diff_normalsed_aer_obs'] += [(murk_i - pm10_i)/pm10_i]
                     statistics[site_id]['aer_obs'] += [pm10_i]
 
                     # if the difference pairs do not posses an NaN (and will therefore be plotted), add 1 to sample size
@@ -564,6 +607,7 @@ if __name__ == '__main__':
                 # all extra stats slots
                 statistics[site_id]['back_diff_log'] += [np.log10(mod_back_i) - np.log10(obs_back_i)]
                 statistics[site_id]['back_diff_norm'] += [mod_back_i - obs_back_i]
+                statistics[site_id]['back_diff_norm_normalised_back_obs'] += [(mod_back_i - obs_back_i)/obs_back_i]
                 statistics[site_id]['abs_back_diff_norm'] += [np.abs(mod_back_i - obs_back_i)]
                 statistics[site_id]['abs_back_diff_log'] += [np.abs(np.log10(mod_back_i) - np.log10(obs_back_i))]
 
@@ -604,13 +648,14 @@ if __name__ == '__main__':
     #         if len(stats_copy[key]) != 0:
     #             for i in idx_lt[0]:
     #                 stats_copy[key][i] = np.nan
-    #     sampleSize -= len(idx_lt[0])
-    #     r, p = spearmanr(stats_copy['aer_diff'], stats_copy['back_diff_log'],
+    #     s = np.sum(~np.isnan(stats_copy['aer_diff']))
+    #     r, p = spearmanr(stats_copy['aer_diff'], stats_copy['back_diff_norm'],
     #                      nan_policy='omit')
     #
     #     print 'val =' + str(val)
     #     print r
     #     print p
+    #     print s
     #     print ''
 
 
@@ -665,7 +710,11 @@ if __name__ == '__main__':
 
         # fill MAE statistics
         MAE['MAE'] += [np.nanmean(np.array(statistics[site_id]['abs_back_diff_norm'])[m_bin_idx])]
-        MAE['AE'] += [np.array(statistics[site_id]['abs_back_diff_norm'])[m_bin_idx]]
+        # MAE['AE'] += [np.array(statistics[site_id]['abs_back_diff_norm'])[m_bin_idx]]
+        # temp
+        a = np.array(statistics[site_id]['back_diff_norm'])[m_bin_idx]
+        MAE['AE'] += [a[~np.isnan(a)]]
+
         MAE['stddev MAE'] += [np.nanstd(np.array(statistics[site_id]['abs_back_diff_norm'])[m_bin_idx])]
         MAE['aer_diff'] += [[bin_s_i, bin_e_i]]
         MAE['n'] += [len(m_bin_idx)]
@@ -674,13 +723,19 @@ if __name__ == '__main__':
     # plot MAE
     # work around needed for end box as it only has two values.
     fig, ax = plt.subplots(1, 1, figsize=(6, 3.5))
-    plt.boxplot(MAE['AE'][:-1], widths=bin, positions=pos[:-1], whis=[5, 95], sym='x', hold=True)
-    if len(MAE['AE'][-1]) == 2:
-        plt.scatter([pos[-1],pos[-1]], MAE['AE'][-1], marker='x', color='black')
+
+    # if the last box of the boxplot only has two points, scatter the points instead of making the boxplot
+    if len(MAE['AE'][-1]) < 4:
+        plt.boxplot(MAE['AE'][:-1], widths=bin, positions=pos[:-1], whis=[5, 95], sym='x', hold=True)
+        # plt.scatter([pos[-1],pos[-1]], MAE['AE'][-1], marker='x', color='black')
+        plt.scatter(np.repeat(pos[-1], len(MAE['AE'][-1])), MAE['AE'][-1], marker='x', color='black')
+        plt.scatter(pos[:-1], MAE['MAE'][:-1], marker='o', color='blue', edgecolor='blue')
+
     else:
-        raise ValueError('End box n != 2, make sure data is being plotted correctly \n'
-                         'a specific work around is currently implemented!')
-    plt.scatter(pos[:-1], MAE['MAE'][:-1], marker='o', color='blue', edgecolor='blue')
+        plt.boxplot(MAE['AE'], widths=bin, positions=pos, whis=[5, 95], sym='x', hold=True)
+        plt.scatter(pos, MAE['MAE'], marker='o', color='blue', edgecolor='blue')
+        # raise ValueError('End box n != 2, make sure data is being plotted correctly \n'
+        #                  'a specific work around is currently implemented!')
 
 
     # prettify
@@ -690,7 +745,8 @@ if __name__ == '__main__':
     ax.set_xlabel(r'$Difference \/\mathrm{(m_{MURK} - PM_{10})}$')
     ax.set_ylabel(r'$Absolute \/\/Error\/\/\/ \mathrm{(|\beta_m - \beta_o|)}$')
     ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
-    ax.set_ylim([0.0, 6.0e-06])
+    #ax.set_ylim([0.0, 6.0e-06]) #orig
+    ax.set_ylim([-10.0e-06, 10.0e-06])
 
     # add sample size at the top of plot for each box and whiskers
     # pos_t = np.arange(numBoxes) + 1
@@ -704,7 +760,7 @@ if __name__ == '__main__':
     plt.subplots_adjust(left=0.1)
     plt.tight_layout()
     plt.savefig(savedir + 'mae/' +
-                'MAE_clearSkyPeriod_median_IQR_meanDots.png')
+                'MAE_clearSkyPeriod_median_IQR_meanDots2.png')
     plt.close(fig)
 
 
@@ -712,14 +768,11 @@ if __name__ == '__main__':
 
     # ---------------
 
-
-
-
     # pass in statistics with site id!
     if pm10_stats == True:
         plot_back_point_diff(statistics[site_id],
                                    savedir, model_type, ceil_gate_num, ceil, sampleSize, corr, var_type='aerosol',
-                                   c_type='rh_mod', extra = '')
+                                   c_type='rh_mod', extra = '_norm_back_newpress')
 
     if rh_stats == True:
         plot_back_point_diff(statistics[site_id],
@@ -787,17 +840,18 @@ if __name__ == '__main__':
     # extract x and y data so the plotting code is more readable
     x_data = statistics[site]['back_obs']
     y_data = statistics[site]['back_mod']
-    c_key = 'rh_obs'
+
+    c_key = 'rh_diff'
     c_data = statistics[site][c_key]
 
     # c_min = -40.0
     # c_max = 100.0
 
-    c_min = 40.0
-    c_max = 100.0
+    # c_min = 40.0
+    # c_max = 100.0
 
-    # c_min = -30.0
-    # c_max = 30.0
+    c_min = -30.0
+    c_max = 30.0
 
     fig = plt.figure(figsize=(7.5, 4))
     ax = plt.subplot2grid((1, 1), (0, 0))
@@ -821,14 +875,14 @@ if __name__ == '__main__':
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = plt.colorbar(scat, cax=cax, norm=norm)
     if c_key[:2] == 'rh':
-        cbar.set_label(r'$RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
+        cbar.set_label(r'$\Delta RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
     elif c_key[:3] == 'aer' :
         cbar.set_label(r'$m\/[\mu g\/ kg^{-1}]$', labelpad=-38, y=1.075, rotation=0)
-
 
     ax.set_xlabel(r'$\mathrm{\beta_o}$')
     ax.set_ylabel(r'$\mathrm{\beta_m}$')
     ax.set_ylim([np.nanmin(y_data), np.nanmax(y_data)])
+    #ax.set_ylim([np.nanmin(y_data), np.nanmax(y_data)])
     ax.set_xlim([np.nanmin(x_data), np.nanmax(x_data)])
     #ax.set_ylim([-1e-5, 1e-5])
     #ax.set_xlim([-1e-5, 1e-5])
@@ -854,27 +908,28 @@ if __name__ == '__main__':
     # extract x and y data so the plotting code is more readable
     x_data = statistics[site]['rh_mod']
     y_data = np.array(statistics[site]['back_mod']) / np.array(statistics[site]['back_obs'])
-    c_key = 'aer_diff'
+    c_key = 'aer_mod'
     c_data = statistics[site][c_key]
 
-    # aer_diff
-    c_min = -40.0
-    c_max = 100.0
-
-    # # aer mod
-    # c_min = 0.0
+    # # aer_diff
+    # c_min = -40.0
     # c_max = 100.0
+
+    # aer mod
+    c_min = 0.0
+    c_max = 100.0
 
     # # rh diff
     # c_min = -30.0
     # c_max = 30.0
+
 
     fig = plt.figure(figsize=(6, 4.5))
     ax = plt.subplot2grid((1, 1), (0, 0))
 
     # define the colormap
     # cmap, norm = discrete_colour_map(c_min, c_max, 13)
-    cmap, norm = discrete_colour_map(c_min, c_max, 15)
+    cmap, norm = discrete_colour_map(c_min, c_max, 11)
 
     # plot data
     # scat = plt.scatter(x_data, y_data, c=statistics[site]['rh_obs'], s=6, vmin=40.0, vmax=100.0, cmap=cmap, norm=norm)
@@ -885,44 +940,38 @@ if __name__ == '__main__':
              [np.nanmax([x_data, y_data]), np.nanmax([x_data, y_data])],
              linestyle='--', color='grey', alpha=0.5)
 
-    # # add 0 lines
-    # ax.axhline(linestyle='--', color='grey', alpha=0.5)
+    # # add ratio=1 line
+    ax.axhline(1, linestyle='--', color='grey', alpha=0.5)
     # ax.axvline(linestyle='--', color='grey', alpha=0.5)
 
     # ax.set_ylim([-5e-06, 5e-06])
-    ax.set_ylim([0.0, 4.5])
+    ax.set_ylim([0.0, 3.5])
     # ax.set_ylim([np.nanmin([x_data, y_data]), np.nanmax([x_data, y_data])])
     ax.set_xlim([np.nanmin([x_data, y_data]), np.nanmax([x_data, y_data])])
+    # ax.set_xlim([-30.0, 30.0])
 
     # add colourbar on the side
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = plt.colorbar(scat, cax=cax, norm=norm)
     if c_key[:2] == 'rh':
-        cbar.set_label(r'$RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
+        cbar.set_label(r'$\Delta RH\/[\%]$', labelpad=-38, y=1.075, rotation=0)
     elif c_key[:3] == 'aer' :
-        cbar.set_label(r'$\Delta\/m\/[\mu g\/ kg^{-1}]$', labelpad=-38, y=1.075, rotation=0)
-        # cbar.set_label(r'$m\/[\mu g\/ kg^{-1}]$', labelpad=-38, y=1.075, rotation=0)
+        # cbar.set_label(r'$\Delta\/m\/[\mu g\/ kg^{-1}]$', labelpad=-38, y=1.075, rotation=0)
+        cbar.set_label(r'$m_{MURK}\/[\mu g\/ kg^{-1}]$', labelpad=-38, y=1.075, rotation=0)
 
 
     ax.set_xlabel(r'$RH$')
     ax.set_ylabel(r'$\mathrm{\beta_m / \beta_o}$')
-    ax.set_ylim([np.nanmin(y_data), np.nanmax(y_data)])
-    #ax.set_ylim([-1e-5, 1e-5])
-    #ax.set_xlim([-1e-5, 1e-5])
-    # ax.set_ylabel(r'$Difference \/\mathrm{(log_{10}(\beta_m) - log_{10}(\beta_o))}$')
-    # ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
 
-    #fig.suptitle(ceil + '; n = ' + str(sampleSize) + '; r = ' + '{:1.2f}'.format(corr['r']) +
-    #             '; p = ' + '%1.2f' % corr['p'])
     plt.tight_layout()
     plt.subplots_adjust(top=0.90)
     plt.savefig(savedir + 'beta_o_vs_beta_m/' +
-                model_type + '_scatter_beta_m_beta_o_ratio_vs_rh_mod_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '_c_'+c_key+'_'+
+                model_type + '_scatter_beta_m_beta_o_ratio_vs_aer_diff_' + ceil + '_clearDays_gate' + str(ceil_gate_num) + '_c_'+c_key+'_'+
                 '.png')  # filename
 
     plt.close(fig)
 
 
 
-print 'END PROGRAM'
+    print 'END PROGRAM'

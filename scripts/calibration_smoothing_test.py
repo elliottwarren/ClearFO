@@ -64,8 +64,8 @@ def read_window_trans(site, ceildatadir):
     fname2 = ceildatadir + ceil_id + '_CCW30_' + site_id + '_2016_15min.nc'
 
     # read window transmission
-    transmission1 = ceil.netCDF_read_CCW30(fname1, var_type='transmission')
-    transmission2 = ceil.netCDF_read_CCW30(fname2, var_type='transmission')
+    transmission1 = ceil.netCDF_read_CCW30(fname1, vars='transmission')
+    transmission2 = ceil.netCDF_read_CCW30(fname2, vars='transmission')
 
     # merge dictionaries
     # transmission = eu.merge_dicts(transmission1, transmission1)
@@ -96,8 +96,8 @@ def read_pulse(site, ceildatadir):
     fname2 = ceildatadir + ceil_id + '_CCW30_' + site_id + '_2016_15min.nc'
 
     # read window transmission
-    transmission1 = ceil.netCDF_read_CCW30(fname1, var_type='pulse')
-    transmission2 = ceil.netCDF_read_CCW30(fname2, var_type='pulse')
+    transmission1 = ceil.netCDF_read_CCW30(fname1, vars='pulse')
+    transmission2 = ceil.netCDF_read_CCW30(fname2, vars='pulse')
 
     # merge dictionaries
     # transmission = eu.merge_dicts(transmission1, transmission1)
@@ -631,11 +631,19 @@ if __name__ == '__main__':
 
     site_bsc = {'CL31-B_RGS': 28.1 - 19.4, 'CL31-C_MR': 32.0 - 27.5, 'CL31-A_KSS45W': 64.3, 'CL31-D_NK': 27.0 - 23.2}
 
-    # clear sky days
+    # clear sky days to overplot onto thecalibration
     daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
                   '20161129', '20161130', '20161204']
 
     clear_days = dateList_to_datetime(daystrList)
+
+    # # regime styles - [start, end, regime type]
+    # regimes = {'CL31-A_KSS45W': {'1': [dt.date(2015, 2, 24), dt.date(2015, 6, 20), 'time'],
+    #                              '2': [dt.date(2015, 9, 01), dt.date(2016, 4, 01), 'block_avg']},
+    #            'CL31-B_RGS': {'1': [dt.date(2015, 2, 5), dt.date(2016, 12, 31), 'window_transmission']},
+    #            'CL31-C_MR': {'1': [dt.date(2015, 2, 5), dt.date(2016, 7, 28), 'block_avg'],
+    #                          '2': [dt.date(2016, 7, 28), dt.date(2016, 12, 31), 'block_avg']},
+    #            'CL31-D_NK': {'1': [dt.date(2015, 2, 5), dt.date(2016, 12, 31), 'window_transmission']}}
 
     # regime styles - [start, end, regime type]
     regimes = {'CL31-A_KSS45W': {'1': [dt.date(2015, 2, 24), dt.date(2015, 6, 20), 'time'],
@@ -643,7 +651,8 @@ if __name__ == '__main__':
                'CL31-B_RGS': {'1': [dt.date(2015, 2, 5), dt.date(2016, 12, 31), 'window_transmission']},
                'CL31-C_MR': {'1': [dt.date(2015, 2, 5), dt.date(2016, 7, 28), 'block_avg'],
                              '2': [dt.date(2016, 7, 28), dt.date(2016, 12, 31), 'block_avg']},
-               'CL31-D_NK': {'1': [dt.date(2015, 2, 5), dt.date(2016, 12, 31), 'window_transmission']}}
+               'CL31-D_NK': {'1': [dt.date(2011, 6, 5), dt.date(2012, 5, 1), 'block_avg'],
+                             '2': [dt.date(2015, 2, 5), dt.date(2016, 12, 31), 'window_transmission']}}
 
     # regimes = {'CL31-A_KSS45W': {'1': [dt.date(2015, 2, 24), dt.date(2015, 6, 20), 'time']}}
 
