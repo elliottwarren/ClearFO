@@ -14,6 +14,7 @@ from matplotlib.dates import DateFormatter
 from forward_operator import FOUtils as FO
 from forward_operator import FOconstants as FOcon
 import ellUtils as eu
+import pickle
 
 
 def dateList_to_datetime(dayList):
@@ -74,7 +75,10 @@ def main():
     site_bsc_colours = FOcon.site_bsc_colours
 
     # high pollution case study day
-    daystrList = ['20160119']
+    daystrList = ['20160504']
+
+    # daystrList = ['20150414', '20150415', '20150421', '20150611', '20160504', '20160823', '20160911', '20161125',
+     #             '20161129', '20161130', '20161204']
 
     days_iterate = dateList_to_datetime(daystrList)
 
@@ -103,18 +107,39 @@ def main():
         # reads all london model data, extracts site data, stores in single dictionary
         mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910, version=0.2, allvars=True)
 
+        # # Check wv impact on day
+        # pickledir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/testing/'
+        # with open(pickledir + 'WITHwatervapour905.pickle', 'rb') as handle:
+        #     highwv = pickle.load(handle)
+        #
+        # with open(pickledir + 'WITHwatervapour905.pickle', 'rb') as handle:
+        #     lowwv = pickle.load(handle)
+        #
+        # for site in highwv.iterkeys():
+        #     print 'site='+site
+        #     print np.nanmean(lowwv[site]['backscatter'][:, 0:15] / highwv[site]['backscatter'][:, 0:15])
+
+        # # read in CSAT Q_H obs
+        # datapath = datadir + 'L1/CSAT3_ECpack_KSSW_' + day.strftime('%Y%j') + '_30min.nc'
+        # CSAT3 = eu.netCDF_read(datapath, vars='')
+
         # read in CSAT Q_H obs
-        datapath = datadir + 'L1/CSAT3_ECpack_KSSW_2016019_30min.nc'
-        CSAT3 = eu.netCDF_read(datapath, vars='')
+        datapaths = [datadir + 'L1/CSAT3_ECpack_KSSW_' + day.strftime('%Y%j') + '_30min.nc',
+                    datadir + 'L1/CSAT3_ECpack_KSSW_' + (day + dt.timedelta(days=1)).strftime('%Y%j') + '_30min.nc']
+        CSAT3 = eu.netCDF_read(datapaths, vars='')
 
         time_obs = CSAT3['time']
+        time_obs = [i - dt.timedelta(minutes=30) for i in time_obs]
         var_obs = CSAT3['Q_H']
+
+        # quick QAQC (flagged data = -999.0)
+        CSAT3['Q_H'][CSAT3['Q_H'] == -999.0] = np.nan
 
         # idx heights to pull z
         zidx = 3
 
         # LINE PLOT
-        fig, ax = plt.subplots(1, 1, figsize=(6, 2.5))
+        fig, ax = plt.subplots(1, 1, figsize=(7, 2.5))
 
         # actual heights of UKV data
         for site in ceil_metadata.iterkeys():
@@ -129,22 +154,30 @@ def main():
             # time_mod = mod_data['MR']['time']
             time_mod = mod_data[site]['time']
 
-            plt.plot_date(time_mod, var_mod, linestyle='-', marker='o', markersize=4, label=r'$Q_{H,'+site+'}$')
+            plt.plot_date(time_mod, var_mod, linestyle='-', markersize=4, fmt='-', label=r'$Q_{H,'+site+'}$')
         # plt.plot_date(time_mod, var_mod_kss45w, linestyle='-', marker='o', markersize=4, label='$Q_{H,KSS45W}$')
-        plt.plot_date(time_obs, var_obs, linestyle='-', marker='o', markersize=4, label=r'$Q_{H,o}$')
+        plt.plot_date(time_obs, var_obs, linestyle='-', markersize=4, color='black', ls='--', fmt='-', label=r'$Q_{H,o}$')
         plt.axhline(0, linestyle='--', alpha=0.5)
+
+        # Is it the Best or MORUSES urban scheme?
+        if day < dt.datetime(2016, 3, 15):
+            eu.add_at(ax, r'$a)\/ Best$', loc=2)
+        else:
+            eu.add_at(ax, r'$b)\/ MORUSES$', loc=2)
+
 
         ax.set_xlabel(r'$Time \/\/[HH:MM]$')
         ax.set_ylabel(r'$Q_{H} \/\/[W\/m^{-2}]$')
-        ax.set_ylim([-10.0, 100.0])
+        ax.set_ylim([-50.0, 350.0])
         ax.set_xlim([day, day + dt.timedelta(days=1)])
         ax.xaxis.set_major_formatter(DateFormatter('%H:%M'))
         #plt.suptitle('Q_H z_mr=' + str(z_mr) + 'm.png')
-        plt.legend(fontsize=10)
         plt.tight_layout()
+        fig.subplots_adjust(top=0.95, right=0.8)
+        plt.legend(fontsize=10, bbox_to_anchor=(1.01, 1), loc=2, borderaxespad=0.0)
 
         # fname = variable+'_MR' + '_' + str(z_mr) + 'm_'+ 'm_lineplot.png'
-        fname = variable + '_5sites_lineplot.png'
+        fname = variable + '_' + day.strftime('%Y%m%d') + '_5sites_lineplot.png'
         plt.savefig(savedir + 'point_diff/picking_heights/' + fname)
 
     plt.close('all')

@@ -174,7 +174,7 @@ def main():
         mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910, version=0.2, allvars=True)
 
         # idx heights to pull z
-        zidx_mr = 1
+        zidx_mr = 3
         zidx_kss45w = 3
 
         # actual heights of both

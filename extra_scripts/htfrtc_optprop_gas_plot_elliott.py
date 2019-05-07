@@ -140,8 +140,9 @@ for lam_idx, lam_i in zip(range(len(lam_cent)), lam_cent):
     # modify weights so they add up to 1 - append value to gaussian list
     # convex combination - https://en.wikipedia.org/wiki/Weighted_arithmetic_mean#Convex_combination_example
     wv_gaussians_i = weights/np.sum(weights)
-    # wv_gaussians += [wv_gaussians_i]
-    wv_gaussians += [weights]
+    wv_gaussians += [wv_gaussians_i]
+    # wv_gaussians += [weights] # alternative to above to quickly store the unormalised weights
+
 
     # what each value is worth (mean will have the highest weight but not 1, as all the weights need to add up to 1 in the end)
     # store value in numpy array of predefined size

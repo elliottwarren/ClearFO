@@ -85,7 +85,7 @@ def main():
     # Read Ceilometer metadata
 
     # ceilometer list to use
-    ceilsitefile = 'CeilsCSVfull.csv'
+    ceilsitefile = 'CeilsCSVclearFO.csv'
     ceil_metadata = FO.read_ceil_metadata(datadir, ceilsitefile)
 
     for day in days_iterate:
@@ -101,7 +101,7 @@ def main():
         # extract MURK aerosol and calculate RH for each of the sites in the ceil metadata
         # reads all london model data, extracts site data, stores in single dictionary
         mod_data = FO.mod_site_extract_calc(day, ceil_metadata, modDatadir, model_type, res, 910,
-                                            m_coeff=m_coeff, Z=Z, version=0.2)
+                                            allvars=True, Z=Z, version=0.2)
 
         a=1
 
