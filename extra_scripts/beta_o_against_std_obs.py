@@ -50,6 +50,25 @@ def read_met_obs(metdatadir, daystrList):
 
     return met_obs
 
+def read_aer_obs(aerdatadir, day):
+    """
+    Read aerosol observations
+    :param aerdatadir:
+    :param day:
+    :return:
+    """
+
+    filename = aerdatadir + '/' + day.strftime('%Y%m%d') + '_PM10_HollowayRoad.csv'
+    aer_obs_raw = eu.csv_read(filename)
+
+    dates_raw = [aer_obs_raw[i][2] for i in range(1, len(aer_obs_raw))]
+    dates = [dt.datetime.strptime(i, '%d/%m/%Y %H:%M') for i in dates_raw]
+
+    pm10_raw = [float(aer_obs_raw[i][3]) for i in range(1, len(aer_obs_raw))]
+    aer_obs = {'pm10': pm10_raw, 'time': dates}
+
+    return aer_obs
+
 if __name__ == '__main__':
 
     # ---------------------------
@@ -61,6 +80,7 @@ if __name__ == '__main__':
     datadir = 'C:/Users/Elliott/Documents/PhD Reading/PhD Research/Aerosol Backscatter/clearFO/data/'
     ceildatadir = datadir +'L1/'
     metdatadir = datadir +'URAO/'
+    aerdatadir = datadir + 'ERG/'
     savedir = maindir + 'figures/dailyplots/'
 
     #daystrList = ['20170709'] # URAO
@@ -104,6 +124,10 @@ if __name__ == '__main__':
         met_obs['RH'] = np.squeeze(met_obs['RH']) # get rid of unecessary dimensions
         rad_obs['Kdn'] = np.squeeze(rad_obs['Kdn'])
 
+    # 3. aerosol obs
+    # PM10 (if IMU site) - Holloway Road (nearby)
+    if site == 'IMU':
+        aer_obs = read_aer_obs(aerdatadir, day)
 
     # ----------------------
     # Process
@@ -133,7 +157,9 @@ if __name__ == '__main__':
     # ax[2].plot_date(met_obs['time'], met_obs['RH'], color='blue', linewidth=2, fmt='-', ls='-')
     # eu.add_at(ax[2], 'c)', loc=2, frameon=True)
 
-    ax[1].plot_date(rad_obs['time'], rad_obs['Kdn'], color='orange', linewidth=2, fmt='-', ls='-')
+    # ax[1].plot_date(rad_obs['time'], rad_obs['Kdn'], color='orange', linewidth=2, fmt='-', ls='-')
+    # eu.add_at(ax[1], 'b)', loc=2, frameon=True)
+    ax[1].plot_date(aer_obs['time'], aer_obs['pm10'], color='red', linewidth=2, fmt='-', ls='-')
     eu.add_at(ax[1], 'b)', loc=2, frameon=True)
     ax[2].plot_date(met_obs['time'], met_obs['RH'], color='blue', linewidth=2, fmt='-', ls='-')
     eu.add_at(ax[2], 'c)', loc=2, frameon=True)
@@ -151,14 +177,16 @@ if __name__ == '__main__':
         ax_i.xaxis.set_major_formatter(DateFormatter('%H:%M'))
 
     ax[0].set_ylabel('Height [m]', fontsize=13)
-    ax[1].set_ylabel('incoming\nshortwave '+r'$\mathrm{[W\/m_{-2}]}$', fontsize=13)
-    ax[2].set_ylabel('RH [%]',labelpad=20, fontsize=13)
+    # ax[1].set_ylabel('incoming\nshortwave '+r'$\mathrm{[W\/m_{-2}]}$', fontsize=13)
+    ax[1].set_ylabel('PM' + r'$_{10}$' +' '+ r'$\mathrm{[\mu g\/\/ m^{-3}]}$', fontsize=13)
+    ax[2].set_ylabel('RH [%]', fontsize=13)
 
     ax[0].xaxis.set_major_formatter(DateFormatter('%H:%M'))
     ax[-1].set_xlabel('Time [HH:MM]')
 
     # ensure radiation window spans 24 hours (like RH)
-    ax[1].set_xlim([met_obs['time'][0], met_obs['time'][-1]])
+    ax[1].set_xlim([bsc_obs[ceil_id_full]['time'][0], bsc_obs[ceil_id_full]['time'][-1]])
+    ax[2].set_xlim([bsc_obs[ceil_id_full]['time'][0], bsc_obs[ceil_id_full]['time'][-1]])
 
     plt.suptitle(site+' CL31')
 
